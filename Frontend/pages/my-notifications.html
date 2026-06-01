@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Notifications — LifePulse</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="app-layout">
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar" id="topbar"></header>
+    <main class="page-content">
+      <div class="page-header">
+        <div class="page-header-left"><h1>My Notifications</h1><p>Stay updated with your donation alerts.</p></div>
+        <div class="page-header-actions">
+          <button class="btn btn-ghost" id="mark-all-btn" onclick="markAll()" style="display:none">✓ Mark All Read</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">🔔 All Notifications</span>
+          <span class="badge badge-red" id="unread-cnt" style="display:none">0 unread</span>
+        </div>
+        <div class="card-body" id="my-notif-list">
+          <div class="loading-overlay"><div class="loading-spinner"></div><p>Loading…</p></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<div id="toast-container"></div>
+<script src="../js/api.js"></script>
+<script src="../js/sidebar.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/app.js"></script>
+<script>
+let myDonorId = null;
+const notifIcons = {appointment_reminder:'📅',donation_complete:'💉',request_approved:'✅',request_rejected:'❌',eligibility_alert:'🩺',stock_low:'⚠️',general:'🔔'};
+
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!requireAuth(['donor'])) return;
+  buildLayout({ activePage: 'my-notifications.html', pageTitle: 'My Notifications' });
+  const user = Auth.getUser();
+  myDonorId = user?.donorId;
+  if (!myDonorId) { document.getElementById('my-notif-list').innerHTML=`<div class="alert alert-warning" style="margin:20px;">Complete your donor profile to see notifications.</div>`; return; }
+  await loadMyNotifs();
+});
+
+async function loadMyNotifs() {
+  const [allRes, unreadRes] = await Promise.all([
+    API.notifications.findAllByDonor(myDonorId),
+    API.notifications.findUnreadByDonor(myDonorId)
+  ]);
+  const all = allRes.ok ? (Array.isArray(allRes.data)?allRes.data:allRes.data?.data||[]) : [];
+  const unread = unreadRes.ok ? (Array.isArray(unreadRes.data)?unreadRes.data:unreadRes.data?.data||[]) : [];
+
+  const cntEl = document.getElementById('unread-cnt');
+  const markBtn = document.getElementById('mark-all-btn');
+  if (unread.length) { cntEl.textContent=`${unread.length} unread`; cntEl.style.display=''; markBtn.style.display=''; }
+  else { cntEl.style.display='none'; markBtn.style.display='none'; }
+
+  const el = document.getElementById('my-notif-list');
+  if (!all.length) { el.innerHTML = emptyState('🔔','No notifications','You have no notifications.'); return; }
+  el.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px;">` +
+    all.map(n => {
+      const isUnread = !n.isRead && !n.read;
+      return `<div style="padding:16px;background:${isUnread?'var(--red-light)':'var(--gray-50)'};border-radius:var(--radius-md);border-left:3px solid ${isUnread?'var(--red)':'var(--gray-200)'};display:flex;gap:12px;">
+        <span style="font-size:1.3rem">${notifIcons[n.type]||'🔔'}</span>
+        <div style="flex:1">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <strong>${n.title||n.subject||'Notification'}</strong>
+            <span style="font-size:0.75rem;color:var(--gray-400)">${timeAgo(n.createdAt)}</span>
+          </div>
+          <div style="font-size:0.875rem;color:var(--gray-500);margin-top:4px;">${n.message||n.body||''}</div>
+          ${isUnread?`<button class="btn btn-ghost btn-sm" style="margin-top:8px;padding:4px 12px;font-size:0.78rem;" onclick="markOne('${n.id}')">Mark as Read</button>`:''}
+        </div>
+      </div>`;
+    }).join('') + '</div>';
+}
+
+async function markOne(id) {
+  const res = await API.notifications.markAsRead(id);
+  if (res.ok) loadMyNotifs();
+}
+
+async function markAll() {
+  const res = await API.notifications.markAllAsRead(myDonorId);
+  if (res.ok) { showToast('All marked as read','success'); loadMyNotifs(); }
+}
+</script>
+</body>
+</html>

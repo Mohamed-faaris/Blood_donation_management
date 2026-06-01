@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Appointments — LifePulse</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="app-layout">
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar" id="topbar"></header>
+    <main class="page-content">
+      <div class="page-header">
+        <div class="page-header-left"><h1>Appointments</h1><p>Schedule and manage donation appointments.</p></div>
+        <div class="page-header-actions">
+          <button class="btn btn-primary" onclick="openAddAppointment()">+ Schedule Appointment</button>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('all', this)">All</button>
+        <button class="tab-btn" onclick="switchTab('upcoming', this)">Upcoming</button>
+        <button class="tab-btn" onclick="switchTab('booked', this)">Booked</button>
+        <button class="tab-btn" onclick="switchTab('completed', this)">Completed</button>
+        <button class="tab-btn" onclick="switchTab('cancelled', this)">Cancelled</button>
+      </div>
+
+      <div class="card">
+        <div class="card-body" style="padding:0">
+          <div id="appt-table"><div class="loading-overlay"><div class="loading-spinner"></div><p>Loading…</p></div></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Schedule Appointment Modal -->
+<div class="modal-overlay" id="appt-modal">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title" id="appt-modal-title">Schedule Appointment</span><button class="modal-close" onclick="closeModal('appt-modal')">✕</button></div>
+    <div class="modal-body">
+      <div id="appt-alert"></div>
+      <div class="form-group"><label class="form-label">Donor *</label>
+        <select class="form-control" id="appt-donor"><option value="">Select Donor</option></select>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Date & Time *</label>
+          <input type="datetime-local" class="form-control" id="appt-date" required>
+        </div>
+        <div class="form-group"><label class="form-label">Location</label>
+          <input type="text" class="form-control" id="appt-location" placeholder="e.g. Main Blood Bank">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Notes</label>
+        <textarea class="form-control" id="appt-notes" placeholder="Any special instructions…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('appt-modal')">Cancel</button>
+      <button class="btn btn-primary" id="appt-save" onclick="saveAppointment()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Update Status Modal -->
+<div class="modal-overlay" id="appt-status-modal">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">Update Appointment Status</span><button class="modal-close" onclick="closeModal('appt-status-modal')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="appt-status-id">
+      <div class="form-group"><label class="form-label">Status *</label>
+        <select class="form-control" id="appt-new-status">
+          <option value="booked">Booked</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="no_show">No Show</option>
+          <option value="rescheduled">Rescheduled</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Reason / Note</label>
+        <textarea class="form-control" id="appt-status-note"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('appt-status-modal')">Cancel</button>
+      <button class="btn btn-primary" id="appt-status-btn" onclick="updateApptStatus()">Update</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="../js/api.js"></script>
+<script src="../js/sidebar.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/app.js"></script>
+<script>
+let editingApptId = null;
+let donorsList = [];
+let currentFilter = 'all';
+
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!requireAuth(['admin'])) return;
+  buildLayout({ activePage: 'appointments.html', pageTitle: 'Appointments', breadcrumb: 'Home / Appointments' });
+  await loadDonorOptions();
+  await loadAppointments();
+});
+
+async function loadDonorOptions() {
+  const res = await API.donors.findAll();
+  if (!res.ok) return;
+  donorsList = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+  const sel = document.getElementById('appt-donor');
+  donorsList.forEach(d => { const o = document.createElement('option'); o.value = d.id; o.textContent = `${d.fullName} (${d.bloodGroup})`; sel.appendChild(o); });
+}
+
+async function loadAppointments() {
+  const el = document.getElementById('appt-table');
+  el.innerHTML = loadingState();
+  let res;
+  if (currentFilter === 'upcoming') {
+    res = await API.appointments.findUpcoming();
+  } else {
+    const q = currentFilter !== 'all' ? `?status=${currentFilter}` : '';
+    res = await API.appointments.findAll(q);
+  }
+  if (!res.ok) { el.innerHTML = emptyState('❌', 'Failed to load', ''); return; }
+  const items = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+  if (!items.length) { el.innerHTML = emptyState('📅', 'No appointments found', ''); return; }
+  el.innerHTML = `<div class="table-container"><table>
+    <thead><tr><th>Donor</th><th>Blood</th><th>Date & Time</th><th>Location</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody>${items.map(a => `<tr>
+      <td><div style="font-weight:600">${a.donor?.fullName || a.donorName || '—'}</div><div style="font-size:0.75rem;color:var(--gray-400)">${a.donor?.email||''}</div></td>
+      <td>${bloodBadge(a.donor?.bloodGroup || a.bloodGroup)}</td>
+      <td><div style="font-weight:600">${formatDate(a.date||a.scheduledDate||a.appointmentDate)}</div><div style="font-size:0.78rem;color:var(--gray-400)">${formatTime(a.date||a.scheduledDate||a.appointmentDate)}</div></td>
+      <td style="font-size:0.85rem">${a.location || '—'}</td>
+      <td>${statusBadge(a.status)}</td>
+      <td><div class="table-actions">
+        <button class="btn btn-ghost btn-sm" onclick="editAppt('${a.id}')">✏️</button>
+        <button class="btn btn-primary btn-sm" onclick="openApptStatus('${a.id}')">Status</button>
+      </div></td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+function switchTab(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadAppointments();
+}
+
+function openAddAppointment() {
+  editingApptId = null;
+  document.getElementById('appt-modal-title').textContent = 'Schedule Appointment';
+  document.getElementById('appt-modal').querySelector('form') && document.getElementById('appt-modal').querySelector('form').reset();
+  document.getElementById('appt-donor').value = '';
+  document.getElementById('appt-date').value = '';
+  document.getElementById('appt-location').value = '';
+  document.getElementById('appt-notes').value = '';
+  document.getElementById('appt-alert').innerHTML = '';
+  openModal('appt-modal');
+}
+
+async function editAppt(id) {
+  const res = await API.appointments.findOne(id);
+  if (!res.ok) { showToast('Failed to load', 'error'); return; }
+  const a = res.data;
+  editingApptId = id;
+  document.getElementById('appt-modal-title').textContent = 'Edit Appointment';
+  document.getElementById('appt-donor').value = a.donorId || a.donor?.id || '';
+  document.getElementById('appt-date').value = (a.date || a.scheduledDate || '')?.slice(0, 16) || '';
+  document.getElementById('appt-location').value = a.location || '';
+  document.getElementById('appt-notes').value = a.notes || '';
+  document.getElementById('appt-alert').innerHTML = '';
+  openModal('appt-modal');
+}
+
+async function saveAppointment() {
+  const donorId = document.getElementById('appt-donor').value;
+  const date = document.getElementById('appt-date').value;
+  const location = document.getElementById('appt-location').value.trim();
+
+  if (!donorId) { document.getElementById('appt-alert').innerHTML=`<div class="alert alert-error">Please select a donor.</div>`; return; }
+  if (!date)    { document.getElementById('appt-alert').innerHTML=`<div class="alert alert-error">Date & time is required.</div>`; return; }
+  if (!location){ document.getElementById('appt-alert').innerHTML=`<div class="alert alert-error">Location is required (e.g. Main Blood Bank).</div>`; return; }
+
+  // ── Pre-check eligibility before attempting to create appointment ──────────
+  // Backend enforces: donor must have a passing eligibility check (isEligible=true).
+  // We check here first to give the user a clear, actionable error message.
+  if (!editingApptId) {
+    const eligRes = await API.eligibility.findLatestByDonor(donorId);
+    if (!eligRes.ok || !eligRes.data || !eligRes.data.isEligible) {
+      const donorName = donorsList.find(d => d.id === donorId)?.fullName || 'This donor';
+      document.getElementById('appt-alert').innerHTML = `
+        <div class="alert alert-error">
+          <strong>${donorName}</strong> does not have a valid eligibility clearance.<br>
+          Please run an eligibility check first on the
+          <a href="eligibility.html" style="color:inherit;text-decoration:underline;">Eligibility page</a>
+          and ensure the result is <em>Eligible</em>.
+        </div>`;
+      return;
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
+  setButtonLoading('appt-save', true);
+
+  // Payload fields match CreateAppointmentDto exactly:
+  // donorId (UUID), scheduledDate (ISO string), location (string), notes? (string)
+  const scheduledDate = new Date(date).toISOString();  // "2026-04-20T08:10:00.000Z"
+  const payload = { donorId, scheduledDate, location };
+  const notes = document.getElementById('appt-notes').value;
+  if (notes) payload.notes = notes;
+
+  const res = editingApptId ? await API.appointments.update(editingApptId, payload) : await API.appointments.create(payload);
+  setButtonLoading('appt-save', false);
+  if (!res.ok) { document.getElementById('appt-alert').innerHTML=`<div class="alert alert-error">${res.data?.message||'Failed'}</div>`; return; }
+  closeModal('appt-modal'); showToast('Appointment saved!', 'success'); loadAppointments();
+}
+
+function openApptStatus(id) {
+  document.getElementById('appt-status-id').value = id;
+  document.getElementById('appt-status-note').value = '';
+  openModal('appt-status-modal');
+}
+
+async function updateApptStatus() {
+  const id = document.getElementById('appt-status-id').value;
+  const status = document.getElementById('appt-new-status').value;
+  const note = document.getElementById('appt-status-note').value;
+  setButtonLoading('appt-status-btn', true);
+  const res = await API.appointments.updateStatus(id, { status, note });
+  setButtonLoading('appt-status-btn', false);
+  if (!res.ok) { showToast(res.data?.message||'Failed', 'error'); return; }
+  closeModal('appt-status-modal'); showToast('Status updated!', 'success'); loadAppointments();
+}
+</script>
+</body>
+</html>

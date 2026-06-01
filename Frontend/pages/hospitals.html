@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hospitals — LifePulse</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="app-layout">
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar" id="topbar"></header>
+    <main class="page-content">
+      <div class="page-header">
+        <div class="page-header-left"><h1>Hospital Management</h1><p>Register and manage partner hospitals.</p></div>
+        <div class="page-header-actions">
+          <button class="btn btn-primary" onclick="openAddHospital()">+ Add Hospital</button>
+        </div>
+      </div>
+
+      <div class="filters-bar">
+        <input type="text" class="form-control" id="f-hname" placeholder="Search hospitals…" oninput="filterHospitals()">
+      </div>
+
+      <div id="hospitals-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;">
+        <div class="loading-overlay" style="grid-column:1/-1"><div class="loading-spinner"></div><p>Loading hospitals…</p></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Add/Edit Hospital Modal -->
+<div class="modal-overlay" id="hosp-modal">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title" id="hosp-modal-title">Add Hospital</span><button class="modal-close" onclick="closeModal('hosp-modal')">✕</button></div>
+    <div class="modal-body">
+      <div id="hosp-alert"></div>
+      <div class="form-group"><label class="form-label">Hospital Name *</label><input type="text" class="form-control" id="h-name" required></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Contact Person</label><input type="text" class="form-control" id="h-contact" placeholder="Full name of contact"></div>
+        <div class="form-group"><label class="form-label">Phone</label><input type="tel" class="form-control" id="h-phone"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-control" id="h-email"></div>
+      <div class="form-group"><label class="form-label">Address *</label><input type="text" class="form-control" id="h-address" required></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">City *</label><input type="text" class="form-control" id="h-city" required></div>
+        <div class="form-group"><label class="form-label">State *</label><input type="text" class="form-control" id="h-state" required></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Pincode</label><input type="text" class="form-control" id="h-pincode"></div>
+        <div class="form-group"><label class="form-label">Status (for editing only)</label>
+          <select class="form-control" id="h-status"><option value="active">Active</option><option value="inactive">Inactive</option><option value="suspended">Suspended</option></select>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Notes</label><textarea class="form-control" id="h-notes" placeholder="Optional remarks…"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('hosp-modal')">Cancel</button>
+      <button class="btn btn-primary" id="hosp-save" onclick="saveHospital()">Save Hospital</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="../js/api.js"></script>
+<script src="../js/sidebar.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/app.js"></script>
+<script>
+let allHospitals = [], editingHospId = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!requireAuth(['admin'])) return;
+  buildLayout({ activePage: 'hospitals.html', pageTitle: 'Hospitals', breadcrumb: 'Home / Hospitals' });
+  await loadHospitals();
+});
+
+async function loadHospitals() {
+  const res = await API.hospitals.findAll();
+  if (!res.ok) { document.getElementById('hospitals-grid').innerHTML = emptyState('❌', 'Failed to load', ''); return; }
+  allHospitals = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+  filterHospitals();
+}
+
+function filterHospitals() {
+  const q = document.getElementById('f-hname').value.toLowerCase();
+  const filtered = allHospitals.filter(h => h.name?.toLowerCase().includes(q) || h.city?.toLowerCase().includes(q));
+  renderHospitals(filtered);
+}
+
+function renderHospitals(hospitals) {
+  const grid = document.getElementById('hospitals-grid');
+  if (!hospitals.length) { grid.innerHTML = emptyState('🏥', 'No hospitals found', 'Add a hospital to get started.'); return; }
+  grid.innerHTML = hospitals.map(h => {
+    const statusColor = {active:'green',inactive:'gray',suspended:'red'}[h.status]||'gray';
+    return `<div class="card" style="padding:24px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div class="avatar avatar-md" style="background:var(--blue-light);color:var(--blue);">🏥</div>
+          <div>
+            <div style="font-weight:700;font-size:0.95rem;">${h.name}</div>
+            <div style="font-size:0.78rem;color:var(--gray-400)">${h.city}, ${h.state}</div>
+          </div>
+        </div>
+        <span class="badge badge-${statusColor}">${h.status||'active'}</span>
+      </div>
+      <div style="font-size:0.82rem;color:var(--gray-500);display:flex;flex-direction:column;gap:4px;margin-bottom:16px;">
+        ${h.phone ? `<div>📞 ${h.phone}</div>` : ''}
+        ${h.email ? `<div>✉️ ${h.email}</div>` : ''}
+        ${h.address ? `<div>📍 ${h.address}</div>` : ''}
+        ${h.licenseNumber||h.license ? `<div>🪪 ${h.licenseNumber||h.license}</div>` : ''}
+      </div>
+      <div class="table-actions">
+        <button class="btn btn-outline btn-sm" onclick="editHospital('${h.id}')">✏️ Edit</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteHospital('${h.id}','${h.name}')">🗑️ Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openAddHospital() {
+  editingHospId = null;
+  document.getElementById('hosp-modal-title').textContent = 'Add Hospital';
+  ['h-name','h-contact','h-phone','h-email','h-address','h-city','h-state','h-pincode','h-notes'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('h-status').value = 'active';
+  document.getElementById('hosp-alert').innerHTML = '';
+  openModal('hosp-modal');
+}
+
+async function editHospital(id) {
+  const res = await API.hospitals.findOne(id);
+  if (!res.ok) { showToast('Failed to load', 'error'); return; }
+  const h = res.data;
+  editingHospId = id;
+  document.getElementById('hosp-modal-title').textContent = 'Edit Hospital';
+  document.getElementById('h-name').value = h.name || '';
+  // Backend field is contactPersonName (not contactPerson or contact)
+  document.getElementById('h-contact').value = h.contactPersonName || '';
+  document.getElementById('h-phone').value = h.phone || '';
+  document.getElementById('h-email').value = h.email || '';
+  document.getElementById('h-address').value = h.address || '';
+  document.getElementById('h-city').value = h.city || '';
+  document.getElementById('h-state').value = h.state || '';
+  document.getElementById('h-pincode').value = h.pincode || '';
+  document.getElementById('h-status').value = h.status || 'active';
+  document.getElementById('h-notes').value = h.notes || '';
+  document.getElementById('hosp-alert').innerHTML = '';
+  openModal('hosp-modal');
+}
+
+async function saveHospital() {
+  const name = document.getElementById('h-name').value.trim();
+  const address = document.getElementById('h-address').value.trim();
+  const city = document.getElementById('h-city').value.trim();
+  const state = document.getElementById('h-state').value.trim();
+  if (!name || !address || !city || !state) { document.getElementById('hosp-alert').innerHTML=`<div class="alert alert-error">Fill all required fields.</div>`; return; }
+  setButtonLoading('hosp-save', true);
+
+  // Build base payload — only include fields accepted by CreateHospitalDto / UpdateHospitalDto
+  // NOTE: 'status' is NOT in CreateHospitalDto (backend defaults to 'active').
+  //       'contactPerson' / 'licenseNumber' are NOT valid DTO fields — removed.
+  const payload = { name, address, city, state };
+
+  // Optional fields that exist in both DTOs (correct DTO key names)
+  const optionalFields = [
+    ['h-contact',  'contactPersonName'], // DTO key: contactPersonName
+    ['h-phone',    'phone'],
+    ['h-email',    'email'],
+    ['h-pincode',  'pincode'],
+    ['h-notes',    'notes'],
+  ];
+  optionalFields.forEach(([elId, key]) => {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    const v = el.tagName === 'TEXTAREA' ? el.value.trim() : el.value.trim();
+    if (v) payload[key] = v;
+  });
+
+  // 'status' is only valid in UpdateHospitalDto — only send on PATCH
+  if (editingHospId) {
+    payload.status = document.getElementById('h-status').value;
+  }
+
+  const res = editingHospId
+    ? await API.hospitals.update(editingHospId, payload)
+    : await API.hospitals.create(payload);
+  setButtonLoading('hosp-save', false);
+  if (!res.ok) { document.getElementById('hosp-alert').innerHTML=`<div class="alert alert-error">${res.data?.message||'Failed'}</div>`; return; }
+  closeModal('hosp-modal'); showToast(editingHospId ? 'Hospital updated!' : 'Hospital added!', 'success'); loadHospitals();
+}
+
+function deleteHospital(id, name) {
+  showConfirm('Delete Hospital', `Delete <strong>${name}</strong>?`, async () => {
+    const res = await API.hospitals.remove(id);
+    if (res.ok) { showToast('Hospital deleted', 'success'); loadHospitals(); }
+    else showToast(res.data?.message||'Failed', 'error');
+  });
+}
+</script>
+</body>
+</html>

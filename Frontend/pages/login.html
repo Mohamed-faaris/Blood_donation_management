@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — LifePulse</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    body { background: linear-gradient(135deg, #fff 0%, var(--red-light) 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .auth-container { display: grid; grid-template-columns: 1fr 1fr; gap: 0; max-width: 960px; width: 100%; background: var(--white); border-radius: var(--radius-xl); overflow: hidden; box-shadow: var(--shadow-lg); }
+    .auth-left { background: linear-gradient(160deg, var(--red) 0%, var(--red-dark) 100%); padding: 60px 48px; display: flex; flex-direction: column; justify-content: center; position: relative; overflow: hidden; }
+    .auth-left::before { content: '🩸'; position: absolute; bottom: -20px; right: -20px; font-size: 12rem; opacity: 0.08; }
+    .auth-left-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 48px; }
+    .auth-left-logo-icon { width: 42px; height: 42px; background: rgba(255,255,255,0.2); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 1.3rem; }
+    .auth-left-logo-name { font-family: var(--font-display); font-size: 1.3rem; color: white; }
+    .auth-left h1 { font-size: 2.2rem; color: white; margin-bottom: 16px; line-height: 1.15; }
+    .auth-left p { color: rgba(255,255,255,0.75); font-size: 0.95rem; margin-bottom: 40px; }
+    .role-badges { display: flex; flex-direction: column; gap: 12px; }
+    .role-badge { display: flex; align-items: center; gap: 14px; background: rgba(255,255,255,0.12); border-radius: var(--radius-md); padding: 14px 18px; border: 1px solid rgba(255,255,255,0.15); }
+    .role-badge-icon { font-size: 1.3rem; }
+    .role-badge-info h4 { color: white; font-size: 0.9rem; font-weight: 700; margin-bottom: 2px; font-family: var(--font-body); }
+    .role-badge-info p { color: rgba(255,255,255,0.6); font-size: 0.78rem; margin: 0; }
+    .auth-right { padding: 60px 48px; display: flex; flex-direction: column; justify-content: center; }
+    .role-tabs { display: flex; gap: 4px; padding: 4px; background: var(--gray-100); border-radius: var(--radius-lg); margin-bottom: 32px; }
+    .role-tab { flex: 1; padding: 10px; border-radius: var(--radius-md); border: none; background: transparent; font-family: var(--font-body); font-size: 0.82rem; font-weight: 700; color: var(--gray-400); cursor: pointer; transition: all var(--transition); text-align: center; }
+    .role-tab.active { background: var(--white); color: var(--red); box-shadow: var(--shadow-sm); }
+    .role-tab-icon { display: block; font-size: 1.2rem; margin-bottom: 4px; }
+    .auth-panel { display: none; }
+    .auth-panel.active { display: block; }
+    .auth-title { font-size: 1.5rem; margin-bottom: 4px; }
+    .auth-sub { font-size: 0.875rem; color: var(--gray-400); margin-bottom: 28px; }
+    .donor-mode-toggle { display: flex; gap: 4px; padding: 4px; background: var(--gray-100); border-radius: var(--radius-md); margin-bottom: 24px; }
+    .donor-mode-btn { flex: 1; padding: 8px; border-radius: 6px; border: none; background: transparent; font-family: var(--font-body); font-size: 0.82rem; font-weight: 600; color: var(--gray-400); cursor: pointer; transition: all var(--transition); }
+    .donor-mode-btn.active { background: var(--white); color: var(--red); box-shadow: var(--shadow-sm); }
+    .back-home { position: fixed; top: 20px; left: 24px; }
+    .divider-or { display: flex; align-items: center; gap: 12px; margin: 20px 0; color: var(--gray-300); font-size: 0.8rem; }
+    .divider-or::before, .divider-or::after { content: ''; flex: 1; border-top: 1px solid var(--gray-200); }
+    @media (max-width: 768px) { .auth-container { grid-template-columns: 1fr; } .auth-left { display: none; } .auth-right { padding: 40px 28px; } }
+  </style>
+</head>
+<body>
+  <a href="../index.html" class="btn btn-ghost btn-sm back-home">← Home</a>
+
+  <div class="auth-container">
+    <!-- Left Panel -->
+    <div class="auth-left">
+      <div class="auth-left-logo">
+        <div class="auth-left-logo-icon">🩸</div>
+        <div class="auth-left-logo-name">LifePulse</div>
+      </div>
+      <h1>Welcome to the Blood Donation Portal</h1>
+      <p>Login based on your role to access the management system.</p>
+      <div class="role-badges">
+        <div class="role-badge">
+          <div class="role-badge-icon">🏥</div>
+          <div class="role-badge-info">
+            <h4>Hospital Incharge</h4>
+            <p>Manage inventory, requests & camps</p>
+          </div>
+        </div>
+        <div class="role-badge">
+          <div class="role-badge-icon">🩸</div>
+          <div class="role-badge-info">
+            <h4>Donor</h4>
+            <p>Register, donate & track your history</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Panel -->
+    <div class="auth-right">
+      <!-- Role Selector Tabs -->
+      <div class="role-tabs">
+        <button class="role-tab" id="tab-hospital" onclick="switchRole('hospital')">
+          <span class="role-tab-icon">🏥</span>Hospital
+        </button>
+        <button class="role-tab active" id="tab-donor" onclick="switchRole('donor')">
+          <span class="role-tab-icon">🩸</span>Donor
+        </button>
+      </div>
+
+      <!-- Hospital Panel -->
+      <div class="auth-panel" id="panel-hospital">
+        <h2 class="auth-title">Hospital Login</h2>
+        <p class="auth-sub">Sign in with credentials provided by the administrator.</p>
+        <div id="hospital-alert"></div>
+        <form id="hospital-form" onsubmit="handleHospitalLogin(event)">
+          <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <input type="email" class="form-control" id="hospital-email" placeholder="hospital@example.com" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" class="form-control" id="hospital-password" placeholder="••••••••" required>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block btn-lg" id="hospital-submit">
+            Sign In as Hospital
+          </button>
+        </form>
+        <div style="margin-top:20px; padding:14px 16px; background: var(--yellow-light); border-radius: var(--radius-md); font-size: 0.82rem; color: #92400e;">
+          ℹ️ Hospital accounts are created by the administrator. Contact your admin if you need access.
+        </div>
+      </div>
+
+      <!-- Donor Panel -->
+      <div class="auth-panel active" id="panel-donor">
+        <h2 class="auth-title" id="donor-title">Donor Login</h2>
+        <p class="auth-sub" id="donor-sub">Welcome back! Sign in to manage your donations.</p>
+
+        <div class="donor-mode-toggle">
+          <button class="donor-mode-btn active" id="mode-login" onclick="setDonorMode('login')">Login</button>
+          <button class="donor-mode-btn" id="mode-register" onclick="setDonorMode('register')">Register</button>
+        </div>
+
+        <div id="donor-alert"></div>
+
+        <!-- Login Form -->
+        <form id="donor-login-form" onsubmit="handleDonorLogin(event)">
+          <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <input type="email" class="form-control" id="donor-email" placeholder="you@email.com" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" class="form-control" id="donor-password" placeholder="••••••••" required>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block btn-lg" id="donor-login-submit">
+            Sign In
+          </button>
+          <p style="text-align:center; margin-top:14px; font-size:0.85rem; color:var(--gray-400);">
+            No account? <a href="#" onclick="setDonorMode('register')">Register as Donor</a>
+          </p>
+        </form>
+
+        <!-- Register Form -->
+        <form id="donor-register-form" style="display:none;" onsubmit="handleDonorRegister(event)">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Full Name *</label>
+              <input type="text" class="form-control" id="reg-name" placeholder="John Doe" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Phone</label>
+              <input type="tel" class="form-control" id="reg-phone" placeholder="+91 9999999999">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email Address *</label>
+            <input type="email" class="form-control" id="reg-email" placeholder="you@email.com" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Password *</label>
+              <input type="password" class="form-control" id="reg-password" placeholder="Min 6 chars" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Confirm Password *</label>
+              <input type="password" class="form-control" id="reg-confirm" placeholder="Repeat password" required>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block btn-lg" id="donor-reg-submit">
+            Create Donor Account
+          </button>
+          <p style="text-align:center; margin-top:14px; font-size:0.85rem; color:var(--gray-400);">
+            Already have an account? <a href="#" onclick="setDonorMode('login')">Sign In</a>
+          </p>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/auth.js"></script>
+  <script>
+    // Check if redirected to register mode
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('mode') === 'register') {
+      switchRole('donor');
+      setDonorMode('register');
+    }
+  </script>
+</body>
+</html>

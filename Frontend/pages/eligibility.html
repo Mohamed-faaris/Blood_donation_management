@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eligibility — LifePulse</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    .donor-info-banner {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 18px;
+      border-radius: var(--radius-md);
+      background: linear-gradient(135deg, rgba(220,38,38,0.08), rgba(220,38,38,0.03));
+      border: 1px solid rgba(220,38,38,0.2);
+      margin-bottom: 4px;
+    }
+    .donor-info-banner .avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--red, #dc2626);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+    .donor-info-banner .donor-details h4 {
+      margin: 0 0 2px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--gray-900, #111);
+    }
+    .donor-info-banner .donor-details p {
+      margin: 0;
+      font-size: 0.78rem;
+      color: var(--gray-500, #6b7280);
+    }
+    .hospital-select-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--red, #dc2626);
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar" id="topbar"></header>
+    <main class="page-content">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h1>Eligibility Check</h1>
+          <p>Check your medical eligibility to donate blood and notify a hospital.</p>
+        </div>
+      </div>
+
+      <div class="content-grid">
+        <!-- Check Form -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">🩺 Run Eligibility Check</span></div>
+          <div class="card-body">
+            <div id="elig-alert"></div>
+
+            <!-- Donor identity — read-only banner -->
+            <div class="form-group">
+              <label class="form-label">Donor</label>
+              <div class="donor-info-banner" id="donor-banner">
+                <div class="avatar" id="donor-avatar">?</div>
+                <div class="donor-details">
+                  <h4 id="donor-display-name">Loading…</h4>
+                  <p id="donor-display-meta">—</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Hospital selector -->
+            <div class="form-group">
+              <label class="form-label hospital-select-label">📍 Send to Hospital *</label>
+              <select class="form-control" id="elig-hospital">
+                <option value="">Select Hospital</option>
+              </select>
+              <small style="color:var(--gray-400);font-size:0.76rem;margin-top:4px;display:block;">
+                Your eligibility request will be sent to this hospital.
+              </small>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Weight (kg)</label><input type="number" class="form-control" id="elig-weight" step="0.1" placeholder="Current weight"></div>
+              <div class="form-group"><label class="form-label">Hemoglobin (g/dL)</label><input type="number" class="form-control" id="elig-hemo" step="0.1" placeholder="Current Hb"></div>
+            </div>
+            <div class="form-group">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <input type="checkbox" id="elig-medical"> Has current medical condition
+              </label>
+            </div>
+            <div class="form-group">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <input type="checkbox" id="elig-recent"> Recent illness (last 2 weeks)
+              </label>
+            </div>
+            <div class="form-group">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <input type="checkbox" id="elig-medication"> On medication
+              </label>
+            </div>
+            <div class="form-group"><label class="form-label">Notes</label><textarea class="form-control" id="elig-notes" placeholder="Additional health details…"></textarea></div>
+            <button class="btn btn-primary btn-block" id="elig-check-btn" onclick="checkEligibility()">Check Eligibility & Notify Hospital</button>
+          </div>
+        </div>
+
+        <!-- Result + History -->
+        <div>
+          <div class="card" id="elig-result-card" style="display:none;">
+            <div class="card-header"><span class="card-title">📋 Eligibility Result</span></div>
+            <div class="card-body" id="elig-result"></div>
+          </div>
+
+          <div class="card" style="margin-top:24px;">
+            <div class="card-header">
+              <span class="card-title">📄 My Eligibility History</span>
+            </div>
+            <div class="card-body" id="elig-history">
+              <div class="empty-state"><div class="empty-icon">⏳</div><h3>Loading…</h3><p>Fetching your eligibility history.</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="../js/api.js"></script>
+<script src="../js/sidebar.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/app.js"></script>
+<script>
+// ─── State ────────────────────────────────────────────────────
+let currentDonorId = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!requireAuth()) return;
+  buildLayout({ activePage: 'eligibility.html', pageTitle: 'Eligibility', breadcrumb: 'Home / Eligibility' });
+
+  const user = Auth.getUser();
+
+  // ── Populate donor identity banner ─────────────────────────
+  if (user) {
+    const nameEl   = document.getElementById('donor-display-name');
+    const metaEl   = document.getElementById('donor-display-meta');
+    const avatarEl = document.getElementById('donor-avatar');
+    const name     = user.fullName || user.name || user.email || 'Donor';
+    nameEl.textContent   = name;
+    avatarEl.textContent = initials(name);
+
+    // If donor role, try to fetch full donor profile for blood group & city
+    if (user.role === 'donor') {
+      // Try donorId from JWT first, then fall back to searching by email
+      if (user.donorId) {
+        currentDonorId = user.donorId;
+        const res = await API.donors.findOne(user.donorId);
+        if (res.ok && res.data) {
+          const d = res.data;
+          const parts = [];
+          if (d.bloodGroup) parts.push(`🩸 ${d.bloodGroup}`);
+          if (d.city)       parts.push(`📍 ${d.city}`);
+          if (d.phone)      parts.push(`📞 ${d.phone}`);
+          metaEl.textContent = parts.join('  ·  ') || 'Donor';
+        } else {
+          metaEl.textContent = user.email || 'Donor';
+        }
+      } else {
+        // Fallback: load all donors and find by email
+        const res = await API.donors.findAll();
+        if (res.ok) {
+          const all = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+          const matched = all.find(d => d.email === user.email);
+          if (matched) {
+            currentDonorId = matched.id;
+            const parts = [];
+            if (matched.bloodGroup) parts.push(`🩸 ${matched.bloodGroup}`);
+            if (matched.city)       parts.push(`📍 ${matched.city}`);
+            if (matched.phone)      parts.push(`📞 ${matched.phone}`);
+            metaEl.textContent = parts.join('  ·  ') || 'Donor';
+          } else {
+            metaEl.textContent = user.email || 'Donor';
+          }
+        } else {
+          metaEl.textContent = user.email || 'Donor';
+        }
+      }
+    } else {
+      metaEl.textContent = user.email || 'Donor';
+    }
+  }
+
+  // ── Load hospitals ─────────────────────────────────────────
+  await loadHospitalOptions();
+
+  // ── Auto-load history ─────────────────────────────────────
+  if (currentDonorId) {
+    loadEligHistory();
+  }
+});
+
+// ── Load hospital dropdown ─────────────────────────────────────
+async function loadHospitalOptions() {
+  const sel = document.getElementById('elig-hospital');
+  const res = await API.hospitals.findAll();
+  if (!res.ok) return;
+  const hospitals = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+  hospitals.forEach(h => {
+    const o = document.createElement('option');
+    o.value       = h.id;
+    o.textContent = `${h.name}${h.city ? ' — ' + h.city : ''}`;
+    sel.appendChild(o);
+  });
+}
+
+// ── Check eligibility and notify hospital ──────────────────────
+async function checkEligibility() {
+  const donorId = currentDonorId;
+  if (!donorId) {
+    document.getElementById('elig-alert').innerHTML =
+      `<div class="alert alert-error">Donor identity not found. Please log out and log back in.</div>`;
+    return;
+  }
+
+  const hospitalId = document.getElementById('elig-hospital').value;
+  if (!hospitalId) {
+    document.getElementById('elig-alert').innerHTML =
+      `<div class="alert alert-error">Please select a hospital to send your eligibility request.</div>`;
+    return;
+  }
+
+  const hemoRaw = document.getElementById('elig-hemo').value;
+  if (!hemoRaw) {
+    document.getElementById('elig-alert').innerHTML =
+      `<div class="alert alert-error">Hemoglobin reading is required.</div>`;
+    return;
+  }
+
+  setButtonLoading('elig-check-btn', true);
+  document.getElementById('elig-alert').innerHTML = '';
+
+  const payload = {
+    donorId,
+    hemoglobin: parseFloat(hemoRaw),
+  };
+  const w = document.getElementById('elig-weight').value;
+  if (w) payload.weight = parseFloat(w);
+
+  const res = await API.eligibility.check(payload);
+  setButtonLoading('elig-check-btn', false);
+
+  if (!res.ok) {
+    document.getElementById('elig-alert').innerHTML =
+      `<div class="alert alert-error">${res.data?.message || 'Eligibility check failed. Please try again.'}</div>`;
+    return;
+  }
+
+  const result  = res.data;
+  const eligible = result.eligible ?? result.isEligible ?? false;
+  const reasons  = result.reasons || result.disqualifyingReasons || [];
+
+  // Show result card
+  const card = document.getElementById('elig-result-card');
+  const el   = document.getElementById('elig-result');
+  card.style.display = '';
+
+  const user = Auth.getUser();
+  const donorName = user?.fullName || user?.name || 'Donor';
+
+  // Get selected hospital name
+  const hospSel  = document.getElementById('elig-hospital');
+  const hospName = hospSel.options[hospSel.selectedIndex]?.text || 'the hospital';
+
+  el.innerHTML = `
+    <div style="text-align:center;padding:20px 0;">
+      <div style="font-size:3rem;margin-bottom:12px;">${eligible ? '✅' : '❌'}</div>
+      <div style="font-size:1.4rem;font-weight:700;color:${eligible ? 'var(--green)' : 'var(--red)'};">
+        ${eligible ? 'ELIGIBLE TO DONATE' : 'NOT ELIGIBLE'}
+      </div>
+      ${result.nextEligibleDate
+        ? `<div style="margin-top:8px;font-size:0.85rem;color:var(--gray-400);">Next eligible: ${formatDate(result.nextEligibleDate)}</div>`
+        : ''}
+    </div>
+    ${reasons.length
+      ? `<hr class="divider"><div style="font-size:0.875rem;"><strong>Reasons:</strong><ul style="margin-top:8px;padding-left:20px;">${reasons.map(r => `<li style="margin-bottom:4px;color:var(--red);">${r}</li>`).join('')}</ul></div>`
+      : ''}
+    ${result.notes ? `<div class="alert alert-info" style="margin-top:12px;">${result.notes}</div>` : ''}`;
+
+  // ── Notify the selected hospital via notification ────────────
+  const notifPayload = {
+    donorId,
+    title: `Eligibility Check — ${donorName}`,
+    message: `Donor ${donorName} has submitted an eligibility check and is ${eligible ? 'ELIGIBLE' : 'NOT ELIGIBLE'} to donate blood. ${reasons.length ? 'Reasons: ' + reasons.join(', ') + '.' : ''} ${result.notes || ''}`.trim(),
+    type: 'eligibility',
+    hospitalId,
+  };
+
+  try {
+    await API.notifications.create(notifPayload);
+    showToast(`✅ Eligibility result sent to ${hospName}`, 'success');
+  } catch {
+    showToast('Eligibility checked, but hospital notification failed.', 'warning');
+  }
+
+  loadEligHistory();
+}
+
+// ── Load my eligibility history ────────────────────────────────
+async function loadEligHistory() {
+  const el = document.getElementById('elig-history');
+  if (!currentDonorId) {
+    el.innerHTML = emptyState('📋', 'No donor found', 'Please log in as a donor.');
+    return;
+  }
+  el.innerHTML = loadingState();
+  const res = await API.eligibility.findAllByDonor(currentDonorId);
+  if (!res.ok) { el.innerHTML = emptyState('❌', 'Failed to load', ''); return; }
+  const items = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+  if (!items.length) {
+    el.innerHTML = emptyState('📋', 'No checks yet', 'Your eligibility history will appear here.');
+    return;
+  }
+  el.innerHTML = `<div style="display:flex;flex-direction:column;gap:10px;">` +
+    items.map(e => `<div style="padding:12px 14px;background:var(--gray-50);border-radius:var(--radius-md);border-left:3px solid ${e.eligible||e.isEligible ? 'var(--green)' : 'var(--red)'};">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span class="badge ${e.eligible||e.isEligible ? 'badge-green' : 'badge-red'}">${e.eligible||e.isEligible ? 'Eligible' : 'Not Eligible'}</span>
+        <span style="font-size:0.78rem;color:var(--gray-400)">${formatDate(e.createdAt||e.checkDate)}</span>
+      </div>
+      ${(e.reasons||[]).length ? `<div style="font-size:0.78rem;color:var(--gray-500);margin-top:6px;">${(e.reasons||[]).join(', ')}</div>` : ''}
+    </div>`).join('') + '</div>';
+}
+</script>
+</body>
+</html>

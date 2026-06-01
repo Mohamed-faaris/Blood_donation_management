@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Profile — LifePulse</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    .profile-hero {
+      background: linear-gradient(135deg, var(--red) 0%, var(--red-dark) 100%);
+      border-radius: var(--radius-xl);
+      padding: 36px 40px;
+      color: white;
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      margin-bottom: 28px;
+      position: relative;
+      overflow: hidden;
+    }
+    .profile-hero::before { content:'🩸'; position:absolute; right:20px; bottom:-20px; font-size:8rem; opacity:0.08; }
+    .profile-avatar-lg {
+      width: 88px; height: 88px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      border: 3px solid rgba(255,255,255,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .profile-hero-info h2 { color: white; margin-bottom: 6px; font-size: 1.6rem; }
+    .profile-hero-info p { color: rgba(255,255,255,0.75); margin: 0; font-size: 0.9rem; }
+    .profile-hero-badges { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+    .profile-hero-badge {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 4px 14px;
+      border-radius: 99px;
+      font-size: 0.8rem;
+      color: white;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar" id="topbar"></header>
+    <main class="page-content">
+      <div class="page-header">
+        <div class="page-header-left"><h1>My Profile</h1><p>Manage your donor profile and health information.</p></div>
+      </div>
+
+      <!-- Profile Hero -->
+      <div class="profile-hero" id="profile-hero">
+        <div class="profile-avatar-lg" id="ph-avatar">?</div>
+        <div class="profile-hero-info">
+          <h2 id="ph-name">Loading…</h2>
+          <p id="ph-email">—</p>
+          <div class="profile-hero-badges">
+            <span class="profile-hero-badge" id="ph-bg">Blood: —</span>
+            <span class="profile-hero-badge" id="ph-city">—</span>
+            <span class="profile-hero-badge" id="ph-status">—</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="content-grid">
+        <!-- Left: Info + Edit -->
+        <div>
+          <!-- Account Info -->
+          <div class="card" style="margin-bottom:24px;">
+            <div class="card-header">
+              <span class="card-title">👤 Account Info</span>
+              <button class="btn btn-outline btn-sm" onclick="openModal('pw-modal')">🔑 Change Password</button>
+            </div>
+            <div class="card-body" id="account-info">
+              <div class="loading-overlay"><div class="loading-spinner"></div></div>
+            </div>
+          </div>
+
+          <!-- Eligibility Status -->
+          <div class="card">
+            <div class="card-header"><span class="card-title">✅ Latest Eligibility</span></div>
+            <div class="card-body" id="elig-status">
+              <div class="loading-overlay"><div class="loading-spinner"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Donor Profile Edit -->
+        <div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">✏️ Edit Donor Profile</span></div>
+            <div class="card-body">
+              <div id="profile-alert"></div>
+              <div id="profile-form-wrap">
+                <div class="loading-overlay"><div class="loading-spinner"></div><p>Loading profile…</p></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Row -->
+      <div class="stats-grid" style="margin-top:28px;" id="donor-stats-row"></div>
+    </main>
+  </div>
+</div>
+
+<!-- Change Password Modal -->
+<div class="modal-overlay" id="pw-modal">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">Change Password</span><button class="modal-close" onclick="closeModal('pw-modal')">✕</button></div>
+    <div class="modal-body">
+      <div id="pw-alert"></div>
+      <div class="form-group"><label class="form-label">Current Password *</label><input type="password" class="form-control" id="pw-current"></div>
+      <div class="form-group"><label class="form-label">New Password *</label><input type="password" class="form-control" id="pw-new" placeholder="Min 6 characters"></div>
+      <div class="form-group"><label class="form-label">Confirm New Password *</label><input type="password" class="form-control" id="pw-confirm"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('pw-modal')">Cancel</button>
+      <button class="btn btn-primary" id="pw-save" onclick="changePassword()">Update Password</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="../js/api.js"></script>
+<script src="../js/sidebar.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/app.js"></script>
+<script>
+let profileDonorId = null;
+let profileUserId = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!requireAuth()) return;
+  buildLayout({ activePage: 'profile.html', pageTitle: 'My Profile' });
+
+  const user = Auth.getUser();
+  profileUserId = user?.id;
+  profileDonorId = user?.donorId;
+
+  // Load account info
+  loadAccountInfo(user);
+
+  // Load donor profile if available
+  if (profileDonorId) {
+    loadDonorProfile(profileDonorId);
+    loadEligibilityStatus(profileDonorId);
+    loadDonorStats(profileDonorId);
+  } else {
+    // No donor profile yet — show create prompt
+    document.getElementById('profile-form-wrap').innerHTML = `
+      <div class="alert alert-warning">You don't have a donor profile yet. Please complete your profile to start donating.</div>
+      <div id="profile-alert-inner"></div>`;
+    document.getElementById('elig-status').innerHTML = emptyState('ℹ️','No profile yet','Complete your donor profile first.');
+    renderProfileForm(null);
+  }
+});
+
+function loadAccountInfo(user) {
+  const el = document.getElementById('account-info');
+  if (!user) { el.innerHTML = '—'; return; }
+  el.innerHTML = `
+    <div class="info-grid">
+      <div class="info-item"><div class="info-label">Full Name</div><div class="info-value">${user.fullName||'—'}</div></div>
+      <div class="info-item"><div class="info-label">Email</div><div class="info-value">${user.email||'—'}</div></div>
+      <div class="info-item"><div class="info-label">Role</div><div class="info-value" style="text-transform:capitalize">${user.role||'—'}</div></div>
+      <div class="info-item"><div class="info-label">Phone</div><div class="info-value">${user.phone||'—'}</div></div>
+      <div class="info-item"><div class="info-label">Account Status</div><div class="info-value">${user.isActive!==false?'<span class="badge badge-green">Active</span>':'<span class="badge badge-gray">Inactive</span>'}</div></div>
+      <div class="info-item"><div class="info-label">Last Login</div><div class="info-value">${user.lastLoginAt?formatDate(user.lastLoginAt):'—'}</div></div>
+    </div>`;
+  // Hero
+  document.getElementById('ph-avatar').textContent = initials(user.fullName||user.email);
+  document.getElementById('ph-name').textContent = user.fullName||'—';
+  document.getElementById('ph-email').textContent = user.email;
+}
+
+async function loadDonorProfile(donorId) {
+  const res = await API.donors.findOne(donorId);
+  if (!res.ok) { document.getElementById('profile-form-wrap').innerHTML = emptyState('❌','Failed to load',''); return; }
+  const d = res.data;
+  // Update hero
+  document.getElementById('ph-bg').textContent = `Blood: ${d.bloodGroup||'—'}`;
+  document.getElementById('ph-city').textContent = `📍 ${d.city||'—'}, ${d.state||'—'}`;
+  document.getElementById('ph-status').textContent = d.isActive ? '✓ Active Donor' : '✗ Inactive';
+  renderProfileForm(d);
+}
+
+function renderProfileForm(d) {
+  const wrap = document.getElementById('profile-form-wrap');
+  wrap.innerHTML = `
+    <form onsubmit="saveProfile(event)">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Full Name *</label><input type="text" class="form-control" id="pf-name" value="${d?.fullName||''}" required></div>
+        <div class="form-group"><label class="form-label">Phone *</label><input type="tel" class="form-control" id="pf-phone" value="${d?.phone||''}" required></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Date of Birth *</label><input type="date" class="form-control" id="pf-dob" value="${d?.dateOfBirth?.split('T')[0]||''}" required></div>
+        <div class="form-group"><label class="form-label">Gender *</label>
+          <select class="form-control" id="pf-gender" required>
+            <option value="">Select</option>
+            <option value="male" ${d?.gender==='male'?'selected':''}>Male</option>
+            <option value="female" ${d?.gender==='female'?'selected':''}>Female</option>
+            <option value="other" ${d?.gender==='other'?'selected':''}>Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Blood Group *</label>
+          <select class="form-control" id="pf-bg" required>
+            <option value="">Select</option>
+            ${['A+','A-','B+','B-','O+','O-','AB+','AB-'].map(bg=>`<option ${d?.bloodGroup===bg?'selected':''}>${bg}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Weight (kg) *</label><input type="number" class="form-control" id="pf-weight" value="${d?.weight||''}" step="0.1" min="45" required></div>
+      </div>
+      <div class="form-group"><label class="form-label">Address *</label><input type="text" class="form-control" id="pf-address" value="${d?.address||''}" required></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">City *</label><input type="text" class="form-control" id="pf-city" value="${d?.city||''}" required></div>
+        <div class="form-group"><label class="form-label">State *</label><input type="text" class="form-control" id="pf-state" value="${d?.state||''}" required></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Pincode *</label><input type="text" class="form-control" id="pf-pincode" value="${d?.pincode||''}" required></div>
+        <div class="form-group"><label class="form-label">Hemoglobin (g/dL)</label><input type="number" class="form-control" id="pf-hemo" value="${d?.hemoglobin||''}" step="0.1"></div>
+      </div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="pf-medical" ${d?.hasMedicalCondition?'checked':''}> Has Medical Condition
+        </label>
+      </div>
+      <div class="form-group" id="pf-medical-notes-wrap" style="${d?.hasMedicalCondition?'':'display:none'}">
+        <label class="form-label">Medical Notes</label>
+        <textarea class="form-control" id="pf-notes">${d?.medicalNotes||''}</textarea>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="pf-save" style="margin-top:8px;">
+        ${d ? 'Update Profile' : 'Create Donor Profile'}
+      </button>
+    </form>`;
+
+  document.getElementById('pf-medical').addEventListener('change', e => {
+    document.getElementById('pf-medical-notes-wrap').style.display = e.target.checked ? '' : 'none';
+  });
+}
+
+async function saveProfile(e) {
+  e.preventDefault();
+  const payload = {
+    fullName: document.getElementById('pf-name').value,
+    phone: document.getElementById('pf-phone').value,
+    dateOfBirth: document.getElementById('pf-dob').value,
+    gender: document.getElementById('pf-gender').value,
+    bloodGroup: document.getElementById('pf-bg').value,
+    weight: parseFloat(document.getElementById('pf-weight').value),
+    address: document.getElementById('pf-address').value,
+    city: document.getElementById('pf-city').value,
+    state: document.getElementById('pf-state').value,
+    pincode: document.getElementById('pf-pincode').value,
+    hasMedicalCondition: document.getElementById('pf-medical').checked,
+  };
+  const hemo = document.getElementById('pf-hemo').value;
+  if (hemo) payload.hemoglobin = parseFloat(hemo);
+  if (payload.hasMedicalCondition) payload.medicalNotes = document.getElementById('pf-notes').value;
+
+  const user = Auth.getUser();
+  setButtonLoading('pf-save', true);
+
+  let res;
+  if (profileDonorId) {
+    res = await API.donors.update(profileDonorId, payload);
+  } else {
+    payload.email = user.email;
+    res = await API.donors.create(payload);
+  }
+
+  setButtonLoading('pf-save', false);
+
+  const alertEl = document.getElementById('profile-alert');
+  if (!res.ok) {
+    if(alertEl) alertEl.innerHTML = `<div class="alert alert-error">${res.data?.message||'Failed to save'}</div>`;
+    return;
+  }
+
+  // Update stored user if donorId is new
+  if (!profileDonorId && res.data?.id) {
+    const updatedUser = { ...user, donorId: res.data.id };
+    Auth.setUser(updatedUser);
+    profileDonorId = res.data.id;
+  }
+
+  if(alertEl) alertEl.innerHTML = '';
+  showToast('Profile saved!', 'success');
+  loadDonorProfile(profileDonorId);
+}
+
+async function loadEligibilityStatus(donorId) {
+  const el = document.getElementById('elig-status');
+  const res = await API.eligibility.findLatestByDonor(donorId);
+  if (!res.ok || !res.data) { el.innerHTML = emptyState('📋','No eligibility check','Run a check from the Eligibility page.'); return; }
+  const e = res.data;
+  const eligible = e.eligible ?? e.isEligible ?? false;
+  el.innerHTML = `
+    <div style="text-align:center;padding:16px 0;">
+      <div style="font-size:2.5rem;margin-bottom:10px;">${eligible?'✅':'❌'}</div>
+      <div style="font-size:1.1rem;font-weight:700;color:${eligible?'var(--green)':'var(--red)'};">${eligible?'Eligible to Donate':'Not Currently Eligible'}</div>
+      ${e.nextEligibleDate?`<div style="font-size:0.85rem;color:var(--gray-400);margin-top:8px;">Next eligible: ${formatDate(e.nextEligibleDate)}</div>`:''}
+      <div style="font-size:0.78rem;color:var(--gray-400);margin-top:6px;">Checked: ${timeAgo(e.createdAt||e.checkDate)}</div>
+    </div>
+    ${(e.reasons||[]).length?`<hr class="divider"><ul style="padding-left:20px;margin:0;">${(e.reasons||[]).map(r=>`<li style="font-size:0.85rem;color:var(--red);margin-bottom:4px;">${r}</li>`).join('')}</ul>`:''}
+    <div style="margin-top:14px;"><a href="eligibility.html" class="btn btn-outline btn-sm btn-block">Run New Check</a></div>`;
+}
+
+async function loadDonorStats(donorId) {
+  const [donRes, apptRes] = await Promise.all([
+    API.donations.findByDonor(donorId),
+    API.appointments.findByDonor(donorId)
+  ]);
+  const donations = donRes.ok ? (Array.isArray(donRes.data)?donRes.data:donRes.data?.data||[]) : [];
+  const appts = apptRes.ok ? (Array.isArray(apptRes.data)?apptRes.data:apptRes.data?.data||[]) : [];
+  const completed = donations.filter(d=>d.status==='completed');
+  const totalUnits = completed.reduce((s,d)=>s+(d.units||d.unitsCollected||0),0);
+  const nextAppt = appts.find(a=>a.status==='booked'||a.status==='scheduled');
+
+  document.getElementById('donor-stats-row').innerHTML = `
+    <div class="stat-card"><div class="stat-icon red">💉</div><div class="stat-info"><div class="stat-value">${donations.length}</div><div class="stat-label">Total Donations</div></div></div>
+    <div class="stat-card"><div class="stat-icon green">📦</div><div class="stat-info"><div class="stat-value">${totalUnits}</div><div class="stat-label">Units Donated</div></div></div>
+    <div class="stat-card"><div class="stat-icon blue">❤️</div><div class="stat-info"><div class="stat-value">${Math.floor(totalUnits*3)}</div><div class="stat-label">Lives Impacted</div></div></div>
+    <div class="stat-card"><div class="stat-icon yellow">📅</div><div class="stat-info"><div class="stat-value">${nextAppt?formatDate(nextAppt.date||nextAppt.scheduledDate):'None'}</div><div class="stat-label">Next Appointment</div></div></div>`;
+}
+
+async function changePassword() {
+  const current = document.getElementById('pw-current').value;
+  const newPw = document.getElementById('pw-new').value;
+  const confirm = document.getElementById('pw-confirm').value;
+  const alertEl = document.getElementById('pw-alert');
+
+  if (!current || !newPw || !confirm) { alertEl.innerHTML=`<div class="alert alert-error">All fields required.</div>`; return; }
+  if (newPw.length < 6) { alertEl.innerHTML=`<div class="alert alert-error">Password must be at least 6 characters.</div>`; return; }
+  if (newPw !== confirm) { alertEl.innerHTML=`<div class="alert alert-error">Passwords do not match.</div>`; return; }
+
+  setButtonLoading('pw-save', true);
+  // Update via users endpoint
+  const res = await API.users.update(profileUserId, { password: newPw, currentPassword: current });
+  setButtonLoading('pw-save', false);
+
+  if (!res.ok) { alertEl.innerHTML=`<div class="alert alert-error">${res.data?.message||'Failed to change password'}</div>`; return; }
+  closeModal('pw-modal');
+  showToast('Password changed successfully!', 'success');
+  document.getElementById('pw-current').value = '';
+  document.getElementById('pw-new').value = '';
+  document.getElementById('pw-confirm').value = '';
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blood Requests — LifePulse</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="app-layout">
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar" id="topbar"></header>
+    <main class="page-content">
+      <div class="page-header">
+        <div class="page-header-left"><h1>Blood Requests</h1><p>Track and manage all blood requests.</p></div>
+        <div class="page-header-actions">
+          <button class="btn btn-primary" onclick="openModal('req-modal')">+ New Request</button>
+        </div>
+      </div>
+
+      <div class="filters-bar">
+        <select class="form-control" id="f-status" onchange="loadRequests()">
+          <option value="">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="fulfilled">Fulfilled</option>
+          <option value="rejected">Rejected</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <select class="form-control" id="f-bg" onchange="loadRequests()">
+          <option value="">All Blood Groups</option>
+          <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+          <option>O+</option><option>O-</option><option>AB+</option><option>AB-</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="resetReqFilters()">✕ Clear</button>
+      </div>
+
+      <div class="card">
+        <div class="card-body" style="padding:0;">
+          <div id="requests-table"><div class="loading-overlay"><div class="loading-spinner"></div><p>Loading…</p></div></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- New Request Modal -->
+<div class="modal-overlay" id="req-modal">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">Create Blood Request</span><button class="modal-close" onclick="closeModal('req-modal')">✕</button></div>
+    <div class="modal-body">
+      <div id="req-alert"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Blood Group *</label>
+          <select class="form-control" id="req-bg">
+            <option value="">Select</option>
+            <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+            <option>O+</option><option>O-</option><option>AB+</option><option>AB-</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Units Required *</label>
+          <input type="number" class="form-control" id="req-units" min="1">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Urgency *</label>
+          <select class="form-control" id="req-urgency">
+            <option value="normal">Normal</option>
+            <option value="urgent">Urgent</option>
+            <option value="critical">Critical</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Required By</label>
+          <input type="datetime-local" class="form-control" id="req-reqby">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Hospital</label>
+        <select class="form-control" id="req-hospital"><option value="">Select Hospital (optional)</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Patient Name</label>
+        <input type="text" class="form-control" id="req-patient" placeholder="Patient's name">
+      </div>
+      <div class="form-group"><label class="form-label">Reason / Notes</label>
+        <textarea class="form-control" id="req-reason" placeholder="Reason for request…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('req-modal')">Cancel</button>
+      <button class="btn btn-primary" id="req-save" onclick="saveRequest()">Submit Request</button>
+    </div>
+  </div>
+</div>
+
+<!-- Update Status Modal -->
+<div class="modal-overlay" id="req-status-modal">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">Update Request Status</span><button class="modal-close" onclick="closeModal('req-status-modal')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="req-status-id">
+      <div class="form-group"><label class="form-label">New Status *</label>
+        <select class="form-control" id="req-new-status">
+          <option value="approved">Approved</option>
+          <option value="fulfilled">Fulfilled</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Note</label>
+        <textarea class="form-control" id="req-status-note" placeholder="Reason or note…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('req-status-modal')">Cancel</button>
+      <button class="btn btn-primary" id="req-status-save" onclick="updateReqStatus()">Update</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="../js/api.js"></script>
+<script src="../js/sidebar.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!requireAuth(['admin','hospital'])) return;
+  buildLayout({ activePage: 'requests.html', pageTitle: 'Blood Requests', breadcrumb: 'Home / Requests' });
+  loadHospitalOptions();
+  await loadRequests();
+});
+
+async function loadHospitalOptions() {
+  const res = await API.hospitals.findAll();
+  if (!res.ok) return;
+  const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+  const sel = document.getElementById('req-hospital');
+  list.forEach(h => { const o = document.createElement('option'); o.value = h.id; o.textContent = h.name; sel.appendChild(o); });
+}
+
+async function loadRequests() {
+  const status = document.getElementById('f-status').value;
+  const bg = document.getElementById('f-bg').value;
+  let q = '?';
+  if (status) q += `status=${status}&`;
+  if (bg) q += `bloodGroup=${encodeURIComponent(bg)}&`;
+  const res = await API.requests.findAll(q);
+  const el = document.getElementById('requests-table');
+  if (!res.ok) { el.innerHTML = emptyState('❌', 'Failed to load', ''); return; }
+  const items = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+  if (!items.length) { el.innerHTML = emptyState('📋', 'No requests found', 'Adjust filters or create a new request.'); return; }
+  el.innerHTML = `<div class="table-container"><table>
+    <thead><tr><th>Blood</th><th>Units</th><th>Patient</th><th>Hospital</th><th>Urgency</th><th>Required By</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody>${items.map(r => `<tr>
+      <td>${bloodBadge(r.bloodGroup)}</td>
+      <td><strong>${r.units ?? r.unitsRequired ?? '—'}</strong></td>
+      <td>${r.patientName || r.patient || '—'}</td>
+      <td style="font-size:0.82rem">${r.hospital?.name || r.hospitalName || '—'}</td>
+      <td>${statusBadge(r.urgency || r.urgencyLevel || 'normal')}</td>
+      <td style="font-size:0.82rem">${r.requiredBy || r.requiredDate ? formatDate(r.requiredBy || r.requiredDate) : '—'}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td><div class="table-actions">
+        ${r.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="openStatusModal('${r.id}')">Update Status</button>` : ''}
+        ${r.status === 'pending' ? `<button class="btn btn-ghost btn-sm" onclick="cancelRequest('${r.id}')">Cancel</button>` : ''}
+      </div></td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+function resetReqFilters() {
+  document.getElementById('f-status').value = '';
+  document.getElementById('f-bg').value = '';
+  loadRequests();
+}
+
+async function saveRequest() {
+  const bg = document.getElementById('req-bg').value;
+  const units = parseInt(document.getElementById('req-units').value);
+  if (!bg || !units) { document.getElementById('req-alert').innerHTML=`<div class="alert alert-error">Blood group and units are required.</div>`; return; }
+  setButtonLoading('req-save', true);
+  // Payload keys must match CreateBloodRequestDto exactly
+  const payload = {
+    bloodGroup: bg,
+    unitsRequired: units,
+    urgency: document.getElementById('req-urgency').value,
+    patientName: 'Unknown',
+    patientPhone: '0000000',
+    hospitalName: 'Unknown Hospital',
+    hospitalAddress: 'Unknown Address',
+  };
+  const rb = document.getElementById('req-reqby').value;
+  if (rb) payload.requiredByDate = new Date(rb).toISOString();
+  else payload.requiredByDate = new Date(Date.now() + 7*24*60*60*1000).toISOString();
+  const hosp = document.getElementById('req-hospital').value;
+  if (hosp) {
+    // Look up selected hospital name/address from the dropdown
+    const hospSel = document.getElementById('req-hospital');
+    const hospText = hospSel.options[hospSel.selectedIndex]?.text || '';
+    payload.hospitalName = hospText || 'Unknown Hospital';
+  }
+  const pt = document.getElementById('req-patient').value; if (pt) payload.patientName = pt;
+  const reason = document.getElementById('req-reason').value; if (reason) payload.reason = reason;
+  const res = await API.requests.create(payload);
+  setButtonLoading('req-save', false);
+  if (!res.ok) { document.getElementById('req-alert').innerHTML=`<div class="alert alert-error">${res.data?.message||'Failed'}</div>`; return; }
+  closeModal('req-modal'); showToast('Request submitted!', 'success'); loadRequests();
+}
+
+function openStatusModal(id) {
+  document.getElementById('req-status-id').value = id;
+  document.getElementById('req-status-note').value = '';
+  openModal('req-status-modal');
+}
+
+async function updateReqStatus() {
+  const id = document.getElementById('req-status-id').value;
+  const status = document.getElementById('req-new-status').value;
+  const note = document.getElementById('req-status-note').value;
+  setButtonLoading('req-status-save', true);
+  const res = await API.requests.updateStatus(id, { status, note });
+  setButtonLoading('req-status-save', false);
+  if (!res.ok) { showToast(res.data?.message || 'Failed', 'error'); return; }
+  closeModal('req-status-modal'); showToast('Status updated!', 'success'); loadRequests();
+}
+
+function cancelRequest(id) {
+  showConfirm('Cancel Request', 'Cancel this blood request?', async () => {
+    const res = await API.requests.cancel(id);
+    if (res.ok) { showToast('Request cancelled', 'success'); loadRequests(); }
+    else showToast(res.data?.message || 'Failed', 'error');
+  });
+}
+</script>
+</body>
+</html>

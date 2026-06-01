@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LifePulse — Blood Donation Management</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/landing.css">  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+</head>
+<body class="landing-body">
+
+  <!-- ── Navigation ─────────────────────────────────────── -->
+  <nav class="landing-nav" id="landingNav">
+    <div class="nav-inner">
+      <a href="index.html" class="nav-logo">
+        <span class="logo-drop">🩸</span>
+        <span class="logo-name">Life<em>Pulse</em></span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#about">About</a></li>
+        <li><a href="#inventory">Inventory</a></li>
+        <li><a href="#camps">Camps</a></li>
+        <li><a href="#donors">Donors</a></li>
+      </ul>
+      <div class="nav-cta">
+        <span id="api-pill" class="api-pill checking">⬤ Checking API…</span>
+        <a href="pages/login.html" class="btn btn-outline btn-sm">Login</a>
+        <a href="pages/login.html?mode=register" class="btn btn-primary btn-sm">Donate Blood →</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Hero ───────────────────────────────────────────── -->
+  <header class="hero-section">
+    <div class="hero-content">
+      <div class="hero-eyebrow">🩸 Blood Donation Management System</div>
+      <h1 class="hero-headline">
+        Every Drop<br>
+        <span class="hero-highlight">Saves a Life</span>
+      </h1>
+      <p class="hero-sub">
+        A complete platform for donors, hospitals, and administrators to manage blood donations, 
+        track inventory, and coordinate life-saving operations.
+      </p>
+      <div class="hero-actions">
+        <a href="pages/login.html?mode=register" class="btn btn-primary btn-lg">Become a Donor</a>
+        <a href="#about" class="btn btn-ghost btn-lg">Learn More ↓</a>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="hero-card-cluster">
+        <div class="mini-card stat-card-mini red">
+          <div class="mini-icon">🩸</div>
+          <div>
+            <div class="mini-val" id="hero-donors">—</div>
+            <div class="mini-lbl">Active Donors</div>
+          </div>
+        </div>
+        <div class="mini-card stat-card-mini green">
+          <div class="mini-icon">✅</div>
+          <div>
+            <div class="mini-val" id="hero-donations">—</div>
+            <div class="mini-lbl">Total Donations</div>
+          </div>
+        </div>
+        <div class="mini-card stat-card-mini blue">
+          <div class="mini-icon">🏕️</div>
+          <div>
+            <div class="mini-val" id="hero-camps">—</div>
+            <div class="mini-lbl">Donation Camps</div>
+          </div>
+        </div>
+        <div class="mini-card stat-card-mini yellow">
+          <div class="mini-icon">🏥</div>
+          <div>
+            <div class="mini-val" id="hero-hospitals">—</div>
+            <div class="mini-lbl">Hospitals</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── About ──────────────────────────────────────────── -->
+  <section id="about" class="section-about">
+    <div class="container">
+      <div class="section-eyebrow">Our Mission</div>
+      <h2 class="section-title">Bridging Donors <br>& Those In Need</h2>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon" style="background: var(--red-light);">🩸</div>
+          <h3>Smart Donor Management</h3>
+          <p>Track donor health history, eligibility, and last donation dates to ensure safe and timely donations.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon" style="background: var(--blue-light);">📊</div>
+          <h3>Real-time Inventory</h3>
+          <p>Monitor blood stock across all blood groups with instant low-stock alerts for hospitals and staff.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon" style="background: var(--green-light);">📅</div>
+          <h3>Appointment Scheduling</h3>
+          <p>Book and manage donation slots with automated reminders and status tracking.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon" style="background: var(--yellow-light);">🏕️</div>
+          <h3>Camp Coordination</h3>
+          <p>Organize blood donation drives and camps with full event management tools.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon" style="background: var(--red-light);">🏥</div>
+          <h3>Hospital Network</h3>
+          <p>Connect registered hospitals for streamlined blood requests and fulfillment.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon" style="background: var(--blue-light);">🔔</div>
+          <h3>Notification System</h3>
+          <p>Keep donors and staff informed with real-time notifications and alerts.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Blood Inventory Public View ───────────────────── -->
+  <section id="inventory" class="section-inventory">
+    <div class="container">
+      <div class="section-eyebrow">Blood Bank</div>
+      <h2 class="section-title">Current Availability</h2>
+      <div id="public-inventory" class="inventory-public-grid">
+        <div class="loading-overlay"><div class="loading-spinner"></div><p>Loading inventory…</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Find Donors ────────────────────────────────────── -->
+  <section id="donors" class="section-donors">
+    <div class="container">
+      <div class="section-eyebrow">Donor Directory</div>
+      <h2 class="section-title">Find a Donor Near You</h2>
+      <div class="donor-search-bar">
+        <select id="donor-bg-filter" class="form-control">
+          <option value="">All Blood Groups</option>
+          <option value="A+">A+</option>
+          <option value="A-">A-</option>
+          <option value="B+">B+</option>
+          <option value="B-">B-</option>
+          <option value="O+">O+</option>
+          <option value="O-">O-</option>
+          <option value="AB+">AB+</option>
+          <option value="AB-">AB-</option>
+        </select>
+        <input type="text" id="donor-city-filter" class="form-control" placeholder="Search by city…">
+        <button class="btn btn-primary" onclick="searchPublicDonors()">Search</button>
+      </div>
+      <div id="public-donors" class="donors-public-grid">
+        <div class="loading-overlay"><div class="loading-spinner"></div><p>Loading donors…</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Upcoming Camps ─────────────────────────────────── -->
+  <section id="camps" class="section-camps">
+    <div class="container">
+      <div class="section-eyebrow">Events</div>
+      <h2 class="section-title">Upcoming Donation Camps</h2>
+      <div id="public-camps" class="camps-public-list">
+        <div class="loading-overlay"><div class="loading-spinner"></div><p>Loading camps…</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CTA ────────────────────────────────────────────── -->
+  <section class="section-cta">
+    <div class="container">
+      <div class="cta-box">
+        <h2>Ready to Save Lives?</h2>
+        <p>Register as a donor today and be part of the change.</p>
+        <div class="cta-actions">
+          <a href="pages/login.html?mode=register" class="btn btn-primary btn-lg">Register as Donor</a>
+          <a href="pages/login.html" class="btn btn-ghost btn-lg" style="border-color:rgba(255,255,255,0.3); color: white;">Hospital Login</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Footer ─────────────────────────────────────────── -->
+  <footer class="landing-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-logo">🩸 LifePulse</div>
+          <p style="font-size:0.85rem; color: var(--gray-400); margin-top:8px;">Blood Donation Management System. Saving lives through technology.</p>
+        </div>
+        <div>
+          <div class="footer-label">Quick Links</div>
+          <ul class="footer-links">
+            <li><a href="#about">About</a></li>
+            <li><a href="#inventory">Blood Inventory</a></li>
+            <li><a href="#camps">Donation Camps</a></li>
+            <li><a href="pages/login.html">Login</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-label">Blood Groups</div>
+          <div class="blood-groups-display">
+            <span class="blood-badge blood-badge-sm">A+</span>
+            <span class="blood-badge blood-badge-sm">A-</span>
+            <span class="blood-badge blood-badge-sm">B+</span>
+            <span class="blood-badge blood-badge-sm">B-</span>
+            <span class="blood-badge blood-badge-sm">O+</span>
+            <span class="blood-badge blood-badge-sm">O-</span>
+            <span class="blood-badge blood-badge-sm">AB+</span>
+            <span class="blood-badge blood-badge-sm">AB-</span>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2025 LifePulse Blood Donation Management. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/api.js"></script>
+  <script src="js/landing.js"></script>
+</body>
+</html>

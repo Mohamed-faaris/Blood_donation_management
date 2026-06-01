@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Blood Requests — LifePulse</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="app-layout">
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar" id="topbar"></header>
+    <main class="page-content">
+      <div class="page-header">
+        <div class="page-header-left"><h1>My Blood Requests</h1><p>Request blood units for yourself or a patient.</p></div>
+        <div class="page-header-actions">
+          <button class="btn btn-primary" onclick="openModal('my-req-modal')">+ New Request</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body" style="padding:0">
+          <div id="my-req-list"><div class="loading-overlay"><div class="loading-spinner"></div><p>Loading…</p></div></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- New Request Modal -->
+<div class="modal-overlay" id="my-req-modal">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">Submit Blood Request</span><button class="modal-close" onclick="closeModal('my-req-modal')">✕</button></div>
+    <div class="modal-body">
+      <div id="my-req-alert"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Blood Group *</label>
+          <select class="form-control" id="mr-bg">
+            <option value="">Select</option>
+            <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+            <option>O+</option><option>O-</option><option>AB+</option><option>AB-</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Units Required *</label>
+          <input type="number" class="form-control" id="mr-units" min="1" placeholder="e.g. 2">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Urgency *</label>
+          <select class="form-control" id="mr-urgency">
+            <option value="normal">Normal</option>
+            <option value="urgent">Urgent</option>
+            <option value="critical">Critical</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Required By</label>
+          <input type="datetime-local" class="form-control" id="mr-reqby">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Patient Name</label>
+        <input type="text" class="form-control" id="mr-patient" placeholder="Patient's name (if for someone else)">
+      </div>
+      <div class="form-group"><label class="form-label">Reason / Additional Notes</label>
+        <textarea class="form-control" id="mr-reason" placeholder="Surgery, emergency, etc."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('my-req-modal')">Cancel</button>
+      <button class="btn btn-primary" id="mr-save" onclick="submitMyRequest()">Submit Request</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="../js/api.js"></script>
+<script src="../js/sidebar.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!requireAuth(['donor'])) return;
+  buildLayout({ activePage: 'my-requests.html', pageTitle: 'My Requests' });
+  await loadMyRequests();
+});
+
+async function loadMyRequests() {
+  const el = document.getElementById('my-req-list');
+  // Donors can see all requests; filter by showing pending/their own
+  const res = await API.requests.findAll();
+  if (!res.ok) { el.innerHTML = emptyState('❌','Failed to load',''); return; }
+  const all = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+  // Filter for requests by this donor (donorId or requestedByDonor)
+  const user = Auth.getUser();
+  const mine = all.filter(r => r.donorId === user.donorId || r.requestedByDonor?.id === user.donorId || r.requestedByDonorId === user.donorId);
+  if (!mine.length) { el.innerHTML = emptyState('📋','No requests yet','Submit a blood request using the button above.'); return; }
+  el.innerHTML = `<div class="table-container"><table>
+    <thead><tr><th>Blood</th><th>Units</th><th>Patient</th><th>Urgency</th><th>Required By</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody>${mine.map(r => `<tr>
+      <td>${bloodBadge(r.bloodGroup)}</td>
+      <td><strong>${r.units??r.unitsRequired??'—'}</strong></td>
+      <td>${r.patientName||r.patient||'—'}</td>
+      <td>${statusBadge(r.urgency||r.urgencyLevel||'normal')}</td>
+      <td style="font-size:0.82rem">${r.requiredBy||r.requiredDate?formatDate(r.requiredBy||r.requiredDate):'—'}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td>${r.status==='pending'?`<button class="btn btn-ghost btn-sm" onclick="cancelMyReq('${r.id}')">Cancel</button>`:'—'}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+async function submitMyRequest() {
+  const bg = document.getElementById('mr-bg').value;
+  const units = parseInt(document.getElementById('mr-units').value);
+  if (!bg || !units) { document.getElementById('my-req-alert').innerHTML=`<div class="alert alert-error">Blood group and units are required.</div>`; return; }
+  setButtonLoading('mr-save', true);
+  // Payload keys must match CreateBloodRequestDto exactly
+  const payload = {
+    bloodGroup: bg,
+    unitsRequired: units,
+    urgency: document.getElementById('mr-urgency').value,
+    patientName: 'Unknown',
+    patientPhone: '0000000',
+    hospitalName: 'Unknown Hospital',
+    hospitalAddress: 'Unknown Address',
+  };
+  const rb = document.getElementById('mr-reqby').value;
+  if (rb) payload.requiredByDate = new Date(rb).toISOString();
+  else payload.requiredByDate = new Date(Date.now() + 7*24*60*60*1000).toISOString();
+  const pt = document.getElementById('mr-patient').value; if(pt) payload.patientName = pt;
+  const reason = document.getElementById('mr-reason').value; if(reason) payload.reason = reason;
+  const user = Auth.getUser();
+  if (user?.donorId) payload.requestedByDonorId = user.donorId;
+  const res = await API.requests.create(payload);
+  setButtonLoading('mr-save', false);
+  if (!res.ok) { document.getElementById('my-req-alert').innerHTML=`<div class="alert alert-error">${res.data?.message||'Failed to submit'}</div>`; return; }
+  closeModal('my-req-modal'); showToast('Request submitted! Wait for admin approval.','success'); loadMyRequests();
+}
+
+function cancelMyReq(id) {
+  showConfirm('Cancel Request','Cancel this blood request?', async () => {
+    const res = await API.requests.cancel(id);
+    if (res.ok) { showToast('Request cancelled','success'); loadMyRequests(); }
+    else showToast(res.data?.message||'Failed','error');
+  });
+}
+</script>
+</body>
+</html>

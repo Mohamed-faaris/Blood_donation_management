@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Donation Camps — LifePulse</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="app-layout">
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar" id="topbar"></header>
+    <main class="page-content">
+      <div class="page-header">
+        <div class="page-header-left"><h1>Donation Camps</h1><p>Organize and manage blood donation events.</p></div>
+        <div class="page-header-actions">
+          <button class="btn btn-primary" onclick="openAddCamp()">+ Create Camp</button>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchCampTab('all', this)">All Camps</button>
+        <button class="tab-btn" onclick="switchCampTab('upcoming', this)">Upcoming</button>
+        <button class="tab-btn" onclick="switchCampTab('ongoing', this)">Ongoing</button>
+        <button class="tab-btn" onclick="switchCampTab('completed', this)">Completed</button>
+      </div>
+
+      <div id="camps-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px;">
+        <div class="loading-overlay" style="grid-column:1/-1"><div class="loading-spinner"></div><p>Loading camps…</p></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Add/Edit Camp Modal -->
+<div class="modal-overlay" id="camp-modal">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title" id="camp-modal-title">Create Camp</span><button class="modal-close" onclick="closeModal('camp-modal')">✕</button></div>
+    <div class="modal-body">
+      <div id="camp-alert"></div>
+      <div class="form-group"><label class="form-label">Camp Name *</label><input type="text" class="form-control" id="c-name" required></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Camp Date *</label><input type="date" class="form-control" id="c-date" required></div>
+        <div class="form-group"><label class="form-label">City *</label><input type="text" class="form-control" id="c-city" required></div>
+      </div>
+      <div class="form-group"><label class="form-label">Venue / Address * (min 5 chars)</label><input type="text" class="form-control" id="c-venue" required minlength="5"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">State *</label><input type="text" class="form-control" id="c-state" required></div>
+        <div class="form-group"><label class="form-label">Organizer Name *</label><input type="text" class="form-control" id="c-organizer" required minlength="2"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Start Time *</label><input type="time" class="form-control" id="c-start" required></div>
+        <div class="form-group"><label class="form-label">End Time *</label><input type="time" class="form-control" id="c-end" required></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Target Donors</label><input type="number" class="form-control" id="c-donors" min="1"></div>
+        <div class="form-group"><label class="form-label">Organizer Phone</label><input type="tel" class="form-control" id="c-phone"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Description</label><textarea class="form-control" id="c-desc"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('camp-modal')">Cancel</button>
+      <button class="btn btn-primary" id="camp-save" onclick="saveCamp()">Save Camp</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="../js/api.js"></script>
+<script src="../js/sidebar.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/app.js"></script>
+<script>
+let allCamps = [], editingCampId = null, campFilter = 'all';
+
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!requireAuth(['admin','hospital'])) return;
+  buildLayout({ activePage: 'camps.html', pageTitle: 'Donation Camps', breadcrumb: 'Home / Camps' });
+  await loadCamps();
+});
+
+async function loadCamps() {
+  const res = campFilter === 'upcoming' ? await API.camps.findUpcoming() : await API.camps.findAll();
+  if (!res.ok) { document.getElementById('camps-grid').innerHTML = emptyState('❌','Failed to load',''); return; }
+  allCamps = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+  let filtered = allCamps;
+  if (campFilter !== 'all' && campFilter !== 'upcoming') filtered = allCamps.filter(c => c.status === campFilter);
+  renderCamps(filtered);
+}
+
+function switchCampTab(filter, btn) {
+  campFilter = filter;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadCamps();
+}
+
+const campStatusColors = { upcoming:'blue', ongoing:'green', completed:'gray', cancelled:'red' };
+
+function renderCamps(camps) {
+  const grid = document.getElementById('camps-grid');
+  if (!camps.length) { grid.innerHTML = emptyState('🏕️','No camps found','Create a new donation camp.'); return; }
+  grid.innerHTML = camps.map(c => `
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div style="background:linear-gradient(135deg,var(--red),var(--red-dark));padding:20px 24px;color:white;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;">
+          <div>
+            <div style="font-weight:700;font-size:1rem;">${c.name||c.campName||'Camp'}</div>
+            <div style="font-size:0.8rem;opacity:0.8;margin-top:4px;">${formatDate(c.date||c.scheduledDate)}</div>
+          </div>
+          <span class="badge badge-${campStatusColors[c.status]||'gray'}" style="background:rgba(255,255,255,0.2);color:white;">${c.status||'upcoming'}</span>
+        </div>
+      </div>
+      <div style="padding:20px 24px;">
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:0.85rem;color:var(--gray-500);margin-bottom:16px;">
+          <div>📍 ${c.location||c.address||'—'}</div>
+          ${c.city ? `<div>🏙️ ${c.city}</div>` : ''}
+          ${c.organizer||c.organizerName ? `<div>👤 ${c.organizer||c.organizerName}</div>` : ''}
+          ${c.phone||c.contactPhone ? `<div>📞 ${c.phone||c.contactPhone}</div>` : ''}
+          ${c.expectedDonors ? `<div>👥 Expected: ${c.expectedDonors} donors</div>` : ''}
+        </div>
+        ${c.description ? `<p style="font-size:0.82rem;color:var(--gray-400);margin-bottom:14px;">${c.description}</p>` : ''}
+        <div class="table-actions">
+          <button class="btn btn-outline btn-sm" onclick="editCamp('${c.id}')">✏️ Edit</button>
+          <button class="btn btn-ghost btn-sm" onclick="deleteCamp('${c.id}','${c.name||c.campName||'Camp'}')">🗑️ Delete</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function openAddCamp() {
+  editingCampId = null;
+  document.getElementById('camp-modal-title').textContent = 'Create Camp';
+  ['c-name','c-venue','c-city','c-state','c-organizer','c-phone','c-desc'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('c-date').value = '';
+  document.getElementById('c-start').value = '09:00';
+  document.getElementById('c-end').value = '17:00';
+  document.getElementById('c-donors').value = '';
+  document.getElementById('camp-alert').innerHTML = '';
+  openModal('camp-modal');
+}
+
+async function editCamp(id) {
+  const res = await API.camps.findOne(id);
+  if (!res.ok) { showToast('Failed to load','error'); return; }
+  const c = res.data;
+  editingCampId = id;
+  document.getElementById('camp-modal-title').textContent = 'Edit Camp';
+  document.getElementById('c-name').value = c.name||c.campName||'';
+  document.getElementById('c-date').value = (c.campDate||c.date||c.scheduledDate||'').slice(0,10)||'';
+  document.getElementById('c-venue').value = c.venue||c.location||c.address||'';
+  document.getElementById('c-city').value = c.city||'';
+  document.getElementById('c-state').value = c.state||'';
+  document.getElementById('c-organizer').value = c.organizerName||c.organizer||'';
+  document.getElementById('c-phone').value = c.organizerPhone||c.phone||c.contactPhone||'';
+  document.getElementById('c-start').value = c.startTime||'09:00';
+  document.getElementById('c-end').value = c.endTime||'17:00';
+  document.getElementById('c-donors').value = c.targetDonors||c.expectedDonors||'';
+  document.getElementById('c-desc').value = c.description||'';
+  document.getElementById('camp-alert').innerHTML = '';
+  openModal('camp-modal');
+}
+
+async function saveCamp() {
+  const name = document.getElementById('c-name').value.trim();
+  const dateVal = document.getElementById('c-date').value;
+  const venue = document.getElementById('c-venue').value.trim();
+  const city = document.getElementById('c-city').value.trim();
+  const state = document.getElementById('c-state').value.trim();
+  const organizerName = document.getElementById('c-organizer').value.trim();
+  const startTime = document.getElementById('c-start').value;
+  const endTime = document.getElementById('c-end').value;
+  if (!name || !dateVal || !venue || !city || !state || !organizerName || !startTime || !endTime) {
+    document.getElementById('camp-alert').innerHTML=`<div class="alert alert-error">Please fill all required fields (name, date, venue, city, state, organizer, times).</div>`; return;
+  }
+  setButtonLoading('camp-save', true);
+  const payload = { name, campDate: new Date(dateVal).toISOString(), venue, city, state, organizerName, startTime, endTime };
+  const phone = document.getElementById('c-phone').value.trim(); if (phone) payload.organizerPhone = phone;
+  const desc = document.getElementById('c-desc').value.trim(); if (desc) payload.description = desc;
+  const td = document.getElementById('c-donors').value; if (td) payload.targetDonors = parseInt(td);
+  const res = editingCampId ? await API.camps.update(editingCampId, payload) : await API.camps.create(payload);
+  setButtonLoading('camp-save', false);
+  if (!res.ok) { document.getElementById('camp-alert').innerHTML=`<div class="alert alert-error">${res.data?.message||'Failed'}</div>`; return; }
+  closeModal('camp-modal'); showToast(editingCampId?'Camp updated!':'Camp created!','success'); loadCamps();
+}
+
+function deleteCamp(id, name) {
+  showConfirm('Delete Camp', `Delete <strong>${name}</strong>?`, async () => {
+    const res = await API.camps.remove(id);
+    if (res.ok) { showToast('Camp deleted','success'); loadCamps(); }
+    else showToast(res.data?.message||'Failed','error');
+  });
+}
+</script>
+</body>
+</html>

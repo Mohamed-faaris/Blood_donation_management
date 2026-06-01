@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Appointments — LifePulse</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="app-layout">
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar" id="topbar"></header>
+    <main class="page-content">
+      <div class="page-header">
+        <div class="page-header-left"><h1>My Appointments</h1><p>Track your donation appointments.</p></div>
+      </div>
+      <div class="card">
+        <div class="card-body" style="padding:0">
+          <div id="my-appt-list"><div class="loading-overlay"><div class="loading-spinner"></div><p>Loading…</p></div></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<div id="toast-container"></div>
+<script src="../js/api.js"></script>
+<script src="../js/sidebar.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!requireAuth(['donor'])) return;
+  buildLayout({ activePage: 'my-appointments.html', pageTitle: 'My Appointments' });
+  const user = Auth.getUser();
+  if (!user?.donorId) {
+    document.getElementById('my-appt-list').innerHTML = `<div class="alert alert-warning" style="margin:20px;">Complete your donor profile first.</div>`;
+    return;
+  }
+  const res = await API.appointments.findByDonor(user.donorId);
+  const el = document.getElementById('my-appt-list');
+  if (!res.ok) { el.innerHTML = emptyState('❌','Failed to load',''); return; }
+  const items = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+  if (!items.length) { el.innerHTML = emptyState('📅','No appointments yet','Your scheduled donations will appear here.'); return; }
+  el.innerHTML = `<div class="table-container"><table>
+    <thead><tr><th>Date & Time</th><th>Location</th><th>Status</th><th>Notes</th></tr></thead>
+    <tbody>${items.map(a => `<tr>
+      <td><div style="font-weight:600">${formatDate(a.date||a.scheduledDate||a.appointmentDate)}</div><div style="font-size:0.78rem;color:var(--gray-400)">${formatTime(a.date||a.scheduledDate||a.appointmentDate)}</div></td>
+      <td>${a.location||'—'}</td>
+      <td>${statusBadge(a.status)}</td>
+      <td style="font-size:0.82rem;color:var(--gray-400)">${a.notes||'—'}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+});
+</script>
+</body>
+</html>

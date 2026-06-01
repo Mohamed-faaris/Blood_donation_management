@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blood Inventory — LifePulse</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="app-layout">
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar" id="topbar"></header>
+    <main class="page-content">
+      <div class="page-header">
+        <div class="page-header-left"><h1>Blood Inventory</h1><p>Monitor stock levels, add units, and manage expiry.</p></div>
+        <div class="page-header-actions">
+          <button class="btn btn-outline" onclick="openModal('issue-modal')">↑ Issue Stock</button>
+          <button class="btn btn-primary" onclick="openModal('add-modal')">+ Add Stock</button>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid" style="margin-bottom:28px;">
+        <div class="stat-card"><div class="stat-icon green">📦</div><div class="stat-info"><div class="stat-value" id="inv-total">—</div><div class="stat-label">Total Units</div></div></div>
+        <div class="stat-card"><div class="stat-icon yellow">⚠️</div><div class="stat-info"><div class="stat-value" id="inv-low">—</div><div class="stat-label">Low Stock Groups</div></div></div>
+        <div class="stat-card"><div class="stat-icon red">❌</div><div class="stat-info"><div class="stat-value" id="inv-critical">—</div><div class="stat-label">Empty / Critical</div></div></div>
+        <div class="stat-card"><div class="stat-icon blue">✅</div><div class="stat-info"><div class="stat-value" id="inv-ok">—</div><div class="stat-label">Well Stocked</div></div></div>
+      </div>
+
+      <!-- Blood Group Cards -->
+      <div id="inventory-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px;margin-bottom:28px;">
+        <div class="loading-overlay" style="grid-column:1/-1"><div class="loading-spinner"></div><p>Loading inventory…</p></div>
+      </div>
+
+      <!-- Check Availability -->
+      <div class="card" style="margin-bottom:24px;">
+        <div class="card-header"><span class="card-title">🔍 Check Blood Availability</span></div>
+        <div class="card-body">
+          <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Blood Group</label>
+              <select class="form-control" id="check-bg" style="min-width:140px;">
+                <option value="">Select</option>
+                <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+                <option>O+</option><option>O-</option><option>AB+</option><option>AB-</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Units Required</label>
+              <input type="number" class="form-control" id="check-units" min="1" placeholder="e.g. 2" style="width:120px;">
+            </div>
+            <button class="btn btn-primary" onclick="checkAvailability()">Check</button>
+          </div>
+          <div id="check-result" style="margin-top:14px;"></div>
+        </div>
+      </div>
+
+      <!-- Low Stock -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">⚠️ Low Stock Alerts</span></div>
+        <div class="card-body" id="low-stock-list"><div class="loading-overlay"><div class="loading-spinner"></div></div></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Add Stock Modal -->
+<div class="modal-overlay" id="add-modal">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">Add Blood Stock</span><button class="modal-close" onclick="closeModal('add-modal')">✕</button></div>
+    <div class="modal-body">
+      <div id="add-alert"></div>
+      <div class="form-group"><label class="form-label">Blood Group *</label>
+        <select class="form-control" id="add-bg">
+          <option value="">Select</option>
+          <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+          <option>O+</option><option>O-</option><option>AB+</option><option>AB-</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Units to Add *</label>
+        <input type="number" class="form-control" id="add-units" min="1" placeholder="Number of units">
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('add-modal')">Cancel</button>
+      <button class="btn btn-primary" id="add-btn" onclick="addStock()">Add Stock</button>
+    </div>
+  </div>
+</div>
+
+<!-- Issue Stock Modal -->
+<div class="modal-overlay" id="issue-modal">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">Issue Blood Stock</span><button class="modal-close" onclick="closeModal('issue-modal')">✕</button></div>
+    <div class="modal-body">
+      <div id="issue-alert"></div>
+      <div class="form-group"><label class="form-label">Blood Group *</label>
+        <select class="form-control" id="issue-bg">
+          <option value="">Select</option>
+          <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+          <option>O+</option><option>O-</option><option>AB+</option><option>AB-</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Units to Issue *</label>
+        <input type="number" class="form-control" id="issue-units" min="1">
+      </div>
+      <div class="form-group"><label class="form-label">Issued To</label>
+        <input type="text" class="form-control" id="issue-to" placeholder="Hospital, patient, or department name">
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('issue-modal')">Cancel</button>
+      <button class="btn btn-primary" id="issue-btn" onclick="issueStock()">Issue Stock</button>
+    </div>
+  </div>
+</div>
+
+<!-- Mark Expired Modal -->
+<div class="modal-overlay" id="expire-modal">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">Mark Stock as Expired</span><button class="modal-close" onclick="closeModal('expire-modal')">✕</button></div>
+    <div class="modal-body">
+      <div class="alert alert-warning">⚠️ This will permanently remove the specified units from inventory as expired.</div>
+      <div class="form-group" style="margin-top:14px;"><label class="form-label">Blood Group *</label>
+        <select class="form-control" id="expire-bg">
+          <option value="">Select</option>
+          <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+          <option>O+</option><option>O-</option><option>AB+</option><option>AB-</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Units to Expire *</label>
+        <input type="number" class="form-control" id="expire-units" min="1" placeholder="How many units to mark expired?">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('expire-modal')">Cancel</button>
+      <button class="btn btn-primary" id="expire-btn" onclick="markExpired()">Mark Expired</button>
+    </div>
+  </div>
+</div>
+
+<!-- Update Threshold Modal -->
+<div class="modal-overlay" id="threshold-modal">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">Update Minimum Threshold</span><button class="modal-close" onclick="closeModal('threshold-modal')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="threshold-bg-hidden">
+      <div class="form-group"><label class="form-label">Blood Group</label><input type="text" class="form-control" id="threshold-bg-display" disabled></div>
+      <div class="form-group"><label class="form-label">Minimum Threshold (units) *</label>
+        <input type="number" class="form-control" id="threshold-val" min="1" placeholder="e.g. 10">
+        <div class="form-hint">Alert will trigger when stock falls below this number.</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('threshold-modal')">Cancel</button>
+      <button class="btn btn-primary" id="threshold-btn" onclick="updateThreshold()">Update</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="../js/api.js"></script>
+<script src="../js/sidebar.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!requireAuth(['admin','hospital'])) return;
+  buildLayout({ activePage: 'inventory.html', pageTitle: 'Blood Inventory', breadcrumb: 'Home / Inventory' });
+  await loadInventory();
+});
+
+async function loadInventory() {
+  const [invRes, lowRes] = await Promise.all([
+    API.inventory.findAll(),
+    API.inventory.getLowStock()
+  ]);
+
+  // Backend: findAll → BloodInventory[] (quantityUnits)
+  const rawItems = invRes.ok ? (Array.isArray(invRes.data) ? invRes.data : (invRes.data?.data || [])) : [];
+  const items = rawItems.map(normalizeInventoryItem);
+
+  // Backend: getLowStock → { total, alerts: BloodInventory[] }
+  const lowData = lowRes.ok ? lowRes.data : { total: 0, alerts: [] };
+  const lowItems = Array.isArray(lowData) ? lowData : (lowData.alerts || []);
+
+  // Stats
+  const total    = items.reduce((s, i) => s + i.units, 0);
+  const lowCount = items.filter(i => i.status === 'low' || (i.units < 20 && i.units > 0)).length;
+  const critical = items.filter(i => i.units === 0).length;
+  const ok       = items.filter(i => i.units >= 20).length;
+
+  document.getElementById('inv-total').textContent    = total;
+  document.getElementById('inv-low').textContent      = lowCount;
+  document.getElementById('inv-critical').textContent = critical;
+  document.getElementById('inv-ok').textContent       = ok;
+
+  // Blood group cards
+  const grid = document.getElementById('inventory-grid');
+  grid.innerHTML = items.map(item => {
+    const u    = item.units;
+    const min  = item.minimumThreshold || 10;
+    const pct  = Math.min(100, Math.round((u / Math.max(min * 5, 50)) * 100));
+    let cls = 'green', label = 'Available', badgeCls = 'badge-green';
+    if (item.status === 'low' || u <= min) { cls = 'yellow'; label = 'Low Stock'; badgeCls = 'badge-yellow'; }
+    if (u === 0) { cls = 'red'; label = 'Empty'; badgeCls = 'badge-red'; }
+
+    return `<div class="card" style="padding:24px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div class="blood-badge" style="width:52px;height:52px;font-size:0.9rem;">${item.bloodGroup}</div>
+        <span class="badge ${badgeCls}">${label}</span>
+      </div>
+      <div style="font-size:2rem;font-weight:700;color:var(--gray-900);margin-bottom:2px;">${u}</div>
+      <div style="font-size:0.72rem;color:var(--gray-400);text-transform:uppercase;font-weight:700;letter-spacing:0.06em;margin-bottom:4px;">Units Available</div>
+      <div style="font-size:0.75rem;color:var(--gray-400);margin-bottom:12px;">Min threshold: ${min} · Total donated: ${item.totalDonated||0} · Issued: ${item.totalIssued||0}</div>
+      <div class="inventory-bar-track" style="margin-bottom:14px;">
+        <div class="inventory-bar-fill bar-${cls}" style="width:${pct}%"></div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn btn-primary btn-sm" onclick="quickAdd('${item.bloodGroup}')">+ Add</button>
+        <button class="btn btn-outline btn-sm" onclick="quickIssue('${item.bloodGroup}')">↑ Issue</button>
+        <button class="btn btn-ghost btn-sm" onclick="quickExpire('${item.bloodGroup}')">Expire</button>
+        <button class="btn btn-ghost btn-sm" onclick="openThreshold('${item.bloodGroup}',${item.minimumThreshold||10})">⚙️</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Low stock list
+  const llEl = document.getElementById('low-stock-list');
+  if (!lowItems.length) {
+    llEl.innerHTML = `<div class="alert alert-success">✅ All blood groups are sufficiently stocked!</div>`;
+  } else {
+    llEl.innerHTML = lowItems.map(normalizeInventoryItem).map(i => `
+      <div style="display:flex;align-items:center;gap:14px;padding:14px;background:var(--yellow-light);border-radius:var(--radius-md);margin-bottom:8px;">
+        ${bloodBadge(i.bloodGroup)}
+        <div style="flex:1;">
+          <strong style="font-size:0.95rem;">${i.bloodGroup}</strong>
+          <span style="margin-left:8px;font-size:0.85rem;color:#92400e;">— Only <strong>${i.units}</strong> units remaining (threshold: ${i.minimumThreshold||10})</span>
+          <div style="font-size:0.75rem;color:#92400e;margin-top:2px;">Last updated: ${i.lastUpdatedDate ? formatDate(i.lastUpdatedDate) : '—'}</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="quickAdd('${i.bloodGroup}')">Add Stock</button>
+      </div>`).join('');
+  }
+}
+
+const quickAdd    = (bg) => { document.getElementById('add-bg').value   = bg; openModal('add-modal'); };
+const quickIssue  = (bg) => { document.getElementById('issue-bg').value = bg; openModal('issue-modal'); };
+const quickExpire = (bg) => { document.getElementById('expire-bg').value = bg; openModal('expire-modal'); };
+
+function openThreshold(bg, current) {
+  document.getElementById('threshold-bg-hidden').value  = bg;
+  document.getElementById('threshold-bg-display').value = bg;
+  document.getElementById('threshold-val').value        = current;
+  openModal('threshold-modal');
+}
+
+async function addStock() {
+  const bg    = document.getElementById('add-bg').value;
+  const units = parseInt(document.getElementById('add-units').value);
+  const alertEl = document.getElementById('add-alert');
+  if (!bg || !units || units < 1) { alertEl.innerHTML = `<div class="alert alert-error">Select blood group and enter valid units.</div>`; return; }
+  setButtonLoading('add-btn', true);
+  const payload = { bloodGroup: bg, units };
+  const res = await API.inventory.addStock(payload);
+  setButtonLoading('add-btn', false);
+  if (!res.ok) { alertEl.innerHTML = `<div class="alert alert-error">${res.data?.message || 'Failed to add stock'}</div>`; return; }
+  closeModal('add-modal');
+  document.getElementById('add-units').value = '';
+  showToast(`${units} units of ${bg} added!`, 'success');
+  await loadInventory();
+}
+
+async function issueStock() {
+  const bg    = document.getElementById('issue-bg').value;
+  const units = parseInt(document.getElementById('issue-units').value);
+  const alertEl = document.getElementById('issue-alert');
+  if (!bg || !units || units < 1) { alertEl.innerHTML = `<div class="alert alert-error">Select blood group and enter valid units.</div>`; return; }
+  setButtonLoading('issue-btn', true);
+  const payload = { bloodGroup: bg, units };
+  const to     = document.getElementById('issue-to').value;     if (to)     payload.issuedTo = to;
+  const res = await API.inventory.issueStock(payload);
+  setButtonLoading('issue-btn', false);
+  if (!res.ok) { alertEl.innerHTML = `<div class="alert alert-error">${res.data?.message || 'Insufficient stock or failed'}</div>`; return; }
+  closeModal('issue-modal');
+  document.getElementById('issue-units').value = '';
+  showToast(`${units} units of ${bg} issued!`, 'success');
+  await loadInventory();
+}
+
+async function markExpired() {
+  const bg    = document.getElementById('expire-bg').value;
+  const units = parseInt(document.getElementById('expire-units').value);
+  if (!bg || !units || units < 1) { showToast('Select blood group and enter units', 'warning'); return; }
+  setButtonLoading('expire-btn', true);
+  const res = await API.inventory.markExpired(bg, units);
+  setButtonLoading('expire-btn', false);
+  if (!res.ok) { showToast(res.data?.message || 'Failed to mark expired', 'error'); return; }
+  closeModal('expire-modal');
+  showToast(`${units} units of ${bg} marked as expired`, 'warning');
+  await loadInventory();
+}
+
+async function updateThreshold() {
+  const bg  = document.getElementById('threshold-bg-hidden').value;
+  const val = parseInt(document.getElementById('threshold-val').value);
+  if (!bg || !val || val < 1) { showToast('Enter a valid threshold', 'warning'); return; }
+  setButtonLoading('threshold-btn', true);
+  const res = await API.inventory.update(bg, { minimumThreshold: val });
+  setButtonLoading('threshold-btn', false);
+  if (!res.ok) { showToast(res.data?.message || 'Failed', 'error'); return; }
+  closeModal('threshold-modal');
+  showToast('Threshold updated!', 'success');
+  await loadInventory();
+}
+
+async function checkAvailability() {
+  const bg    = document.getElementById('check-bg').value;
+  const units = document.getElementById('check-units').value;
+  const el    = document.getElementById('check-result');
+  if (!bg || !units) { showToast('Select blood group and enter units', 'warning'); return; }
+  const res = await API.inventory.checkAvailability(bg, units);
+  if (!res.ok) { el.innerHTML = `<div class="alert alert-error">Error checking availability.</div>`; return; }
+  // Backend returns boolean
+  const available = res.data === true || res.data?.available === true;
+  el.innerHTML = available
+    ? `<div class="alert alert-success">✅ <strong>${bg}</strong> has sufficient stock for ${units} unit(s).</div>`
+    : `<div class="alert alert-error">❌ Insufficient <strong>${bg}</strong> stock. Requested: ${units} unit(s).</div>`;
+}
+</script>
+</body>
+</html>

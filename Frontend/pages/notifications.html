@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notifications — LifePulse</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="app-layout">
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar" id="topbar"></header>
+    <main class="page-content">
+      <div class="page-header">
+        <div class="page-header-left"><h1>Notifications</h1><p>Manage donor notifications and alerts.</p></div>
+        <div class="page-header-actions">
+          <button class="btn btn-primary" onclick="openModal('notif-modal')">+ Create Notification</button>
+        </div>
+      </div>
+
+      <div class="content-grid">
+        <div style="grid-column:span 2;">
+          <!-- For Admin: donor selector + create -->
+          <div class="filters-bar">
+            <select class="form-control" id="notif-donor-sel" onchange="loadNotifications()" style="max-width:280px;">
+              <option value="">Select a Donor to View</option>
+            </select>
+            <div style="display:flex;gap:8px;margin-left:auto;">
+              <button class="btn btn-ghost btn-sm" id="mark-all-btn" onclick="markAllRead()" style="display:none">✓ Mark All Read</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title" id="notif-title">🔔 Notifications</span>
+              <span class="badge badge-red" id="unread-badge" style="display:none">0 unread</span>
+            </div>
+            <div class="card-body" id="notif-list">
+              <div class="empty-state"><div class="empty-icon">🔔</div><h3>Select a donor</h3><p>to view their notifications.</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Create Notification Modal -->
+<div class="modal-overlay" id="notif-modal">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">Create Notification</span><button class="modal-close" onclick="closeModal('notif-modal')">✕</button></div>
+    <div class="modal-body">
+      <div id="notif-alert"></div>
+      <div class="form-group"><label class="form-label">Donor *</label>
+        <select class="form-control" id="notif-to-donor"><option value="">Select Donor</option></select>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Type *</label>
+          <select class="form-control" id="notif-type">
+            <option value="general">General</option>
+            <option value="appointment_reminder">Appointment Reminder</option>
+            <option value="donation_complete">Donation Complete</option>
+            <option value="request_approved">Request Approved</option>
+            <option value="request_rejected">Request Rejected</option>
+            <option value="eligibility_alert">Eligibility Alert</option>
+            <option value="stock_low">Stock Low</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Title *</label>
+          <input type="text" class="form-control" id="notif-title-inp" placeholder="Notification title">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Message *</label>
+        <textarea class="form-control" id="notif-msg" placeholder="Notification message…" rows="3"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('notif-modal')">Cancel</button>
+      <button class="btn btn-primary" id="notif-save" onclick="sendNotification()">Send</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="../js/api.js"></script>
+<script src="../js/sidebar.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/app.js"></script>
+<script>
+let currentNotifDonor = null;
+
+const notifIcons = {
+  appointment_reminder: '📅', donation_complete: '💉', request_approved: '✅',
+  request_rejected: '❌', eligibility_alert: '🩺', stock_low: '⚠️', general: '🔔'
+};
+
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!requireAuth(['admin'])) return;
+  buildLayout({ activePage: 'notifications.html', pageTitle: 'Notifications', breadcrumb: 'Home / Notifications' });
+  loadDonorOptions();
+});
+
+async function loadDonorOptions() {
+  const res = await API.donors.findAll();
+  if (!res.ok) return;
+  const donors = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+  ['notif-donor-sel','notif-to-donor'].forEach(selId => {
+    const sel = document.getElementById(selId);
+    donors.forEach(d => { const o=document.createElement('option'); o.value=d.id; o.textContent=`${d.fullName} (${d.bloodGroup})`; sel.appendChild(o); });
+  });
+}
+
+async function loadNotifications() {
+  const donorId = document.getElementById('notif-donor-sel').value;
+  currentNotifDonor = donorId;
+  const el = document.getElementById('notif-list');
+  const markBtn = document.getElementById('mark-all-btn');
+  const unreadBadge = document.getElementById('unread-badge');
+
+  if (!donorId) { el.innerHTML = emptyState('🔔','Select a donor','to view their notifications.'); markBtn.style.display='none'; return; }
+
+  el.innerHTML = loadingState();
+  const [allRes, unreadRes] = await Promise.all([
+    API.notifications.findAllByDonor(donorId),
+    API.notifications.findUnreadByDonor(donorId)
+  ]);
+
+  const all = allRes.ok ? (Array.isArray(allRes.data) ? allRes.data : allRes.data?.data||[]) : [];
+  const unread = unreadRes.ok ? (Array.isArray(unreadRes.data) ? unreadRes.data : unreadRes.data?.data||[]) : [];
+
+  if (unread.length > 0) {
+    unreadBadge.textContent = `${unread.length} unread`;
+    unreadBadge.style.display = '';
+    markBtn.style.display = '';
+  } else {
+    unreadBadge.style.display = 'none';
+    markBtn.style.display = 'none';
+  }
+
+  if (!all.length) { el.innerHTML = emptyState('🔔','No notifications','This donor has no notifications.'); return; }
+
+  el.innerHTML = `<div style="display:flex;flex-direction:column;gap:4px;">` +
+    all.map(n => {
+      const isUnread = !n.isRead && !n.read;
+      return `<div style="padding:14px 16px;background:${isUnread?'var(--red-light)':'var(--white)'};border-radius:var(--radius-md);border:1px solid ${isUnread?'rgba(200,16,46,0.15)':'var(--gray-100)'};display:flex;align-items:flex-start;gap:12px;">
+        <span style="font-size:1.3rem;flex-shrink:0;">${notifIcons[n.type]||'🔔'}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <strong style="font-size:0.9rem;">${n.title||n.subject||'Notification'}</strong>
+            <span style="font-size:0.75rem;color:var(--gray-400);white-space:nowrap;">${timeAgo(n.createdAt)}</span>
+          </div>
+          <div style="font-size:0.85rem;color:var(--gray-500);margin-top:4px;">${n.message||n.body||''}</div>
+          <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
+            <span class="badge badge-gray" style="font-size:0.68rem;">${n.type||'general'}</span>
+            ${isUnread ? `<button class="btn btn-ghost btn-sm" style="padding:2px 10px;font-size:0.75rem;" onclick="markRead('${n.id}')">Mark Read</button>` : '<span style="font-size:0.75rem;color:var(--gray-400);">✓ Read</span>'}
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm btn-icon" title="Delete" onclick="deleteNotif('${n.id}')">🗑️</button>
+      </div>`;
+    }).join('') + '</div>';
+}
+
+async function markRead(id) {
+  const res = await API.notifications.markAsRead(id);
+  if (res.ok) { loadNotifications(); }
+  else showToast('Failed','error');
+}
+
+async function markAllRead() {
+  if (!currentNotifDonor) return;
+  const res = await API.notifications.markAllAsRead(currentNotifDonor);
+  if (res.ok) { showToast('All marked as read','success'); loadNotifications(); }
+  else showToast('Failed','error');
+}
+
+async function deleteNotif(id) {
+  const res = await API.notifications.remove(id);
+  if (res.ok) { showToast('Deleted','success'); loadNotifications(); }
+  else showToast('Failed','error');
+}
+
+async function sendNotification() {
+  const donorId = document.getElementById('notif-to-donor').value;
+  const type = document.getElementById('notif-type').value;
+  const title = document.getElementById('notif-title-inp').value;
+  const message = document.getElementById('notif-msg').value;
+  if (!donorId || !title || !message) {
+    document.getElementById('notif-alert').innerHTML=`<div class="alert alert-error">Donor, title, and message are required.</div>`; return;
+  }
+  setButtonLoading('notif-save', true);
+  const res = await API.notifications.create({ donorId, type, title, message });
+  setButtonLoading('notif-save', false);
+  if (!res.ok) { document.getElementById('notif-alert').innerHTML=`<div class="alert alert-error">${res.data?.message||'Failed'}</div>`; return; }
+  closeModal('notif-modal');
+  showToast('Notification sent!','success');
+  // Refresh if viewing same donor
+  if (currentNotifDonor === donorId) loadNotifications();
+}
+</script>
+</body>
+</html>

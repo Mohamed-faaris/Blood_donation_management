@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — LifePulse</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="app-layout">
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main-content">
+    <header class="topbar" id="topbar"></header>
+
+    <main class="page-content">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h1 id="dash-greeting">Dashboard</h1>
+          <p id="dash-sub">Welcome back! Here's your system overview.</p>
+        </div>
+        <div class="page-header-actions" id="dash-actions">
+          <span id="dash-date" style="font-size:0.85rem;color:var(--gray-400);align-self:center;"></span>
+        </div>
+      </div>
+
+      <!-- Stats Grid (Admin) -->
+      <div class="stats-grid" id="stats-grid" style="margin-bottom:28px;">
+        <div class="stat-card"><div class="stat-icon red">👤</div><div class="stat-info"><div class="stat-value" id="s-donors">—</div><div class="stat-label">Total Donors</div><div class="stat-trend up" id="s-donors-active"></div></div></div>
+        <div class="stat-card"><div class="stat-icon green">💉</div><div class="stat-info"><div class="stat-value" id="s-donations">—</div><div class="stat-label">Total Donations</div><div class="stat-trend up" id="s-donations-month"></div></div></div>
+        <div class="stat-card"><div class="stat-icon blue">📅</div><div class="stat-info"><div class="stat-value" id="s-appointments">—</div><div class="stat-label">Upcoming Appts</div></div></div>
+        <div class="stat-card"><div class="stat-icon yellow">📋</div><div class="stat-info"><div class="stat-value" id="s-requests">—</div><div class="stat-label">Total Requests</div><div class="stat-trend" id="s-req-pending"></div></div></div>
+        <div class="stat-card"><div class="stat-icon red">📦</div><div class="stat-info"><div class="stat-value" id="s-units">—</div><div class="stat-label">Blood Units</div></div></div>
+        <div class="stat-card"><div class="stat-icon yellow">⚠️</div><div class="stat-info"><div class="stat-value" id="s-lowstock">—</div><div class="stat-label">Low Stock Alerts</div></div></div>
+        <div class="stat-card"><div class="stat-icon green">🏕️</div><div class="stat-info"><div class="stat-value" id="s-camps">—</div><div class="stat-label">Upcoming Camps</div></div></div>
+        <div class="stat-card"><div class="stat-icon blue">✅</div><div class="stat-info"><div class="stat-value" id="s-fulfilled">—</div><div class="stat-label">Fulfilled Requests</div></div></div>
+      </div>
+
+      <!-- Content Grid -->
+      <div class="content-grid">
+
+        <!-- Blood Inventory -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">🩸 Blood Inventory Overview</span>
+            <a href="inventory.html" class="btn btn-ghost btn-sm">Manage →</a>
+          </div>
+          <div class="card-body" id="dash-inventory">
+            <div class="loading-overlay"><div class="loading-spinner"></div></div>
+          </div>
+        </div>
+
+        <!-- Recent Blood Requests -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">📋 Recent Blood Requests</span>
+            <a href="requests.html" class="btn btn-ghost btn-sm">View All →</a>
+          </div>
+          <div class="card-body" style="padding:0" id="dash-requests">
+            <div class="loading-overlay"><div class="loading-spinner"></div></div>
+          </div>
+        </div>
+
+        <!-- Upcoming Appointments -->
+        <div class="card" id="card-appts">
+          <div class="card-header">
+            <span class="card-title">📅 Upcoming Appointments</span>
+            <a href="appointments.html" class="btn btn-ghost btn-sm">View All →</a>
+          </div>
+          <div class="card-body" id="dash-appointments">
+            <div class="loading-overlay"><div class="loading-spinner"></div></div>
+          </div>
+        </div>
+
+        <!-- Upcoming Camps -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">🏕️ Upcoming Camps</span>
+            <a href="camps.html" class="btn btn-ghost btn-sm">View All →</a>
+          </div>
+          <div class="card-body" id="dash-camps">
+            <div class="loading-overlay"><div class="loading-spinner"></div></div>
+          </div>
+        </div>
+
+        <!-- Recent Donations (admin only) -->
+        <div class="card" id="dash-donations-card">
+          <div class="card-header">
+            <span class="card-title">💉 Recent Donations</span>
+            <a href="donations.html" class="btn btn-ghost btn-sm">View All →</a>
+          </div>
+          <div class="card-body" style="padding:0" id="dash-donations">
+            <div class="loading-overlay"><div class="loading-spinner"></div></div>
+          </div>
+        </div>
+
+        <!-- Low Stock Alerts -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">⚠️ Low Stock Alerts</span>
+            <a href="inventory.html" class="btn btn-ghost btn-sm">Add Stock →</a>
+          </div>
+          <div class="card-body" id="dash-lowstock">
+            <div class="loading-overlay"><div class="loading-spinner"></div></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Donor Dashboard (shown to donors only) -->
+      <div id="donor-dash" class="hidden">
+        <h2 style="font-size:1.2rem;margin-bottom:20px;margin-top:8px;">Quick Actions</h2>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;" id="donor-quick"></div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="../js/api.js"></script>
+<script src="../js/sidebar.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!requireAuth()) return;
+
+  const user = Auth.getUser();
+  const role = user?.role;
+
+  buildLayout({ activePage: 'dashboard.html', pageTitle: 'Dashboard', breadcrumb: 'Home / Dashboard' });
+
+  // Greeting
+  const hour = new Date().getHours();
+  const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  document.getElementById('dash-greeting').textContent = `${greet}, ${user?.fullName?.split(' ')[0] || 'there'}! 👋`;
+  document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+
+  if (role === 'donor') {
+    showDonorDashboard(user);
+  } else {
+    // Admin or hospital — load full stats
+    await Promise.all([
+      loadDashStats(),
+      loadDashInventory(),
+      loadDashRequests(),
+      loadDashAppointments(),
+      loadDashCamps(),
+      role === 'admin' ? loadDashDonations() : (document.getElementById('dash-donations-card').classList.add('hidden'), Promise.resolve()),
+      loadDashLowStock(),
+    ]);
+    if (role === 'hospital') {
+      document.getElementById('card-appts')?.classList.add('hidden');
+    }
+  }
+});
+
+/* ─── Admin / Hospital Stats ────────────────────────────── */
+async function loadDashStats() {
+  const res = await API.dashboard.getStats();
+  if (!res.ok) return;
+  const s = res.data;
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val ?? '—'; };
+
+  // Nested structure from backend
+  set('s-donors',      s.donors?.total);
+  set('s-donations',   s.donations?.total);
+  set('s-appointments',s.appointments?.upcoming);
+  set('s-requests',    s.requests?.total);
+  set('s-units',       s.inventory?.totalUnits);
+  set('s-lowstock',    s.inventory?.lowStockAlerts?.length);
+  set('s-camps',       s.camps?.upcoming);
+  set('s-fulfilled',   s.requests?.fulfilled);
+
+  // Sub-text trends
+  const activeEl = document.getElementById('s-donors-active');
+  if (activeEl && s.donors?.active !== undefined) activeEl.textContent = `↑ ${s.donors.active} active`;
+
+  const monthEl = document.getElementById('s-donations-month');
+  if (monthEl && s.donations?.thisMonth !== undefined) monthEl.textContent = `${s.donations.thisMonth} this month`;
+
+  const pendEl = document.getElementById('s-req-pending');
+  if (pendEl && s.requests?.pending !== undefined) {
+    pendEl.textContent = `${s.requests.pending} pending`;
+    pendEl.className = `stat-trend ${s.requests.pending > 0 ? 'down' : 'up'}`;
+  }
+
+  // Use inventory from stats directly
+  if (s.inventory?.byBloodGroup?.length) {
+    renderInventoryBars(s.inventory.byBloodGroup, s.inventory.lowStockAlerts);
+  } else {
+    loadDashInventory();
+  }
+}
+
+async function loadDashInventory() {
+  const el = document.getElementById('dash-inventory');
+  if (el.querySelector('.stat-value')) return; // already rendered from stats
+  const res = await API.inventory.findAll();
+  if (!res.ok) { el.innerHTML = emptyState('❌', 'Unable to load', ''); return; }
+  const items = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+  renderInventoryBars(items, []);
+}
+
+function renderInventoryBars(items, lowAlerts = []) {
+  const el = document.getElementById('dash-inventory');
+  const lowSet = new Set((lowAlerts||[]).map(l => l.bloodGroup));
+  const maxUnits = Math.max(...items.map(i => i.units ?? i.quantityUnits ?? 0), 1);
+  el.innerHTML = items.map(item => {
+    const u = item.units ?? item.quantityUnits ?? 0;
+    const pct = Math.min(100, (u / Math.max(maxUnits, 50)) * 100);
+    let cls = 'green';
+    if (lowSet.has(item.bloodGroup) || u < 20) cls = 'yellow';
+    if (u === 0) cls = 'red';
+    return `<div class="inventory-bar-wrap">
+      <div class="inventory-bar-header">
+        <span class="inventory-bar-label">${bloodBadge(item.bloodGroup)} ${item.bloodGroup}</span>
+        <span class="inventory-bar-value">${u} units</span>
+      </div>
+      <div class="inventory-bar-track"><div class="inventory-bar-fill bar-${cls}" style="width:${pct}%"></div></div>
+    </div>`;
+  }).join('') || emptyState('📦', 'No inventory', '');
+}
+
+async function loadDashRequests() {
+  const el = document.getElementById('dash-requests');
+  const res = await API.requests.findAll('?');
+  if (!res.ok) { el.innerHTML = emptyState('❌', 'Unable to load', ''); return; }
+  const items = (Array.isArray(res.data) ? res.data : (res.data?.data || [])).slice(0, 6);
+  if (!items.length) { el.innerHTML = emptyState('📋', 'No requests yet', ''); return; }
+  el.innerHTML = `<div class="table-container"><table>
+    <thead><tr><th>Blood</th><th>Units</th><th>Hospital</th><th>Urgency</th><th>Status</th></tr></thead>
+    <tbody>${items.map(r => `<tr>
+      <td>${bloodBadge(r.bloodGroup)}</td>
+      <td><strong>${r.units ?? r.unitsRequired ?? '—'}</strong></td>
+      <td style="font-size:0.8rem;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.hospital?.name || r.hospitalName || '—'}</td>
+      <td>${statusBadge(r.urgency || r.urgencyLevel || 'normal')}</td>
+      <td>${statusBadge(r.status)}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+async function loadDashAppointments() {
+  const el = document.getElementById('dash-appointments');
+  const res = await API.appointments.findUpcoming();
+  if (!res.ok) { el.innerHTML = emptyState('❌', 'Unable to load', ''); return; }
+  const items = (Array.isArray(res.data) ? res.data : (res.data?.data || [])).slice(0, 5);
+  if (!items.length) { el.innerHTML = emptyState('📅', 'No upcoming appointments', ''); return; }
+  el.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px;">` +
+    items.map(a => `<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--gray-50);border-radius:var(--radius-md);">
+      <div class="avatar avatar-sm">${initials(a.donor?.fullName || a.donorName || 'D')}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;font-size:0.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${a.donor?.fullName || a.donorName || '—'}</div>
+        <div style="font-size:0.75rem;color:var(--gray-400);">${formatDate(a.date || a.scheduledDate)} · ${formatTime(a.date || a.scheduledDate)}</div>
+      </div>
+      ${statusBadge(a.status)}
+    </div>`).join('') + '</div>';
+}
+
+async function loadDashCamps() {
+  const el = document.getElementById('dash-camps');
+  const res = await API.camps.findUpcoming();
+  if (!res.ok) { el.innerHTML = emptyState('❌', 'Unable to load', ''); return; }
+  const items = (Array.isArray(res.data) ? res.data : (res.data?.data || [])).slice(0, 4);
+  if (!items.length) { el.innerHTML = emptyState('🏕️', 'No upcoming camps', ''); return; }
+  el.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px;">` +
+    items.map(c => `<div style="padding:12px 14px;background:var(--gray-50);border-radius:var(--radius-md);border-left:3px solid var(--red);">
+      <div style="font-weight:600;font-size:0.9rem;">${c.name || c.campName || 'Camp'}</div>
+      <div style="font-size:0.78rem;color:var(--gray-400);margin-top:4px;">
+        📅 ${formatDate(c.date || c.scheduledDate)} · 📍 ${c.location || c.address || '—'}
+      </div>
+    </div>`).join('') + '</div>';
+}
+
+async function loadDashDonations() {
+  const el = document.getElementById('dash-donations');
+  const res = await API.donations.findAll();
+  if (!res.ok) { el.innerHTML = emptyState('❌', 'Unable to load', ''); return; }
+  const items = (Array.isArray(res.data) ? res.data : (res.data?.data || [])).slice(0, 5);
+  if (!items.length) { el.innerHTML = emptyState('💉', 'No donations yet', ''); return; }
+  el.innerHTML = `<div class="table-container"><table>
+    <thead><tr><th>Donor</th><th>Blood</th><th>Units</th><th>Date</th><th>Status</th></tr></thead>
+    <tbody>${items.map(d => `<tr>
+      <td style="font-weight:600;font-size:0.85rem;">${d.donor?.fullName || d.donorName || '—'}</td>
+      <td>${bloodBadge(d.bloodGroup || d.donor?.bloodGroup)}</td>
+      <td>${d.units ?? d.unitsCollected ?? '—'}</td>
+      <td style="font-size:0.8rem;">${formatDate(d.date || d.donationDate || d.createdAt)}</td>
+      <td>${statusBadge(d.status)}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+async function loadDashLowStock() {
+  const el = document.getElementById('dash-lowstock');
+  const user = Auth.getUser();
+  // low-stock endpoint is admin-only; hospitals use inventory directly
+  const res = user?.role === 'admin'
+    ? await API.inventory.getLowStock()
+    : await API.inventory.findAll();
+  if (!res.ok) { el.innerHTML = emptyState('❌', 'Unable to load', ''); return; }
+  let items = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+  // For hospital, filter manually for low units
+  if (user?.role !== 'admin') {
+    items = items.filter(i => (i.quantityUnits ?? i.units ?? 0) < 20);
+  }
+  if (!items.length) {
+    el.innerHTML = `<div class="alert alert-success">✅ All blood groups have sufficient stock!</div>`;
+    return;
+  }
+  el.innerHTML = items.map(item => `
+    <div style="display:flex;align-items:center;gap:14px;padding:12px;background:var(--yellow-light);border-radius:var(--radius-md);margin-bottom:8px;">
+      ${bloodBadge(item.bloodGroup)}
+      <div style="flex:1;">
+        <strong>${item.bloodGroup}</strong> — Only ${item.units ?? item.quantityUnits ?? 0} units remaining
+        <div style="font-size:0.78rem;color:#92400e;">Needs restocking urgently</div>
+      </div>
+      <a href="inventory.html" class="btn btn-primary btn-sm">Add Stock</a>
+    </div>`).join('');
+}
+
+/* ─── Donor Dashboard ───────────────────────────────────── */
+function showDonorDashboard(user) {
+  // Hide admin stats
+  document.getElementById('stats-grid').classList.add('hidden');
+  document.querySelectorAll('.content-grid > .card').forEach(c => c.classList.add('hidden'));
+  document.getElementById('donor-dash').classList.remove('hidden');
+
+  // Show donor-relevant stat cards
+  document.getElementById('stats-grid').classList.remove('hidden');
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card"><div class="stat-icon red">💉</div><div class="stat-info"><div class="stat-value" id="d-donations">—</div><div class="stat-label">My Donations</div></div></div>
+    <div class="stat-card"><div class="stat-icon green">📦</div><div class="stat-info"><div class="stat-value" id="d-units">—</div><div class="stat-label">Units Donated</div></div></div>
+    <div class="stat-card"><div class="stat-icon blue">❤️</div><div class="stat-info"><div class="stat-value" id="d-lives">—</div><div class="stat-label">Lives Impacted</div></div></div>
+    <div class="stat-card"><div class="stat-icon yellow">📅</div><div class="stat-info"><div class="stat-value" id="d-next">—</div><div class="stat-label">Next Appointment</div></div></div>`;
+
+  // Quick action cards
+  document.getElementById('donor-quick').innerHTML = [
+    { icon: '📅', label: 'My Appointments', href: 'my-appointments.html', color: 'var(--blue-light)', iconColor: 'var(--blue)' },
+    { icon: '💉', label: 'My Donations', href: 'my-donations.html', color: 'var(--red-light)', iconColor: 'var(--red)' },
+    { icon: '✅', label: 'Check Eligibility', href: 'eligibility.html', color: 'var(--green-light)', iconColor: 'var(--green)' },
+    { icon: '📋', label: 'Blood Requests', href: 'my-requests.html', color: 'var(--yellow-light)', iconColor: 'var(--yellow)' },
+    { icon: '🔔', label: 'Notifications', href: 'my-notifications.html', color: 'var(--blue-light)', iconColor: 'var(--blue)' },
+    { icon: '⚙️', label: 'My Profile', href: 'profile.html', color: 'var(--gray-100)', iconColor: 'var(--gray-500)' },
+  ].map(q => `<a href="${q.href}" style="text-decoration:none;">
+    <div class="card" style="padding:24px;text-align:center;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='var(--shadow-md)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+      <div style="width:48px;height:48px;border-radius:var(--radius-md);background:${q.color};display:flex;align-items:center;justify-content:center;font-size:1.4rem;margin:0 auto 12px;">${q.icon}</div>
+      <div style="font-weight:700;font-size:0.875rem;color:var(--gray-900);">${q.label}</div>
+    </div>
+  </a>`).join('');
+
+  // Also show camp info
+  document.querySelectorAll('.content-grid > .card').forEach(c => c.classList.add('hidden'));
+  const campsCard = document.getElementById('dash-camps')?.closest('.card');
+  const lowCard   = document.getElementById('dash-lowstock')?.closest('.card');
+  if (campsCard) campsCard.classList.remove('hidden');
+  if (lowCard)   lowCard.classList.remove('hidden');
+
+  loadDashCamps();
+  loadDashLowStock();
+
+  if (user?.donorId) loadDonorStats(user.donorId);
+}
+
+async function loadDonorStats(donorId) {
+  const [donRes, apptRes] = await Promise.all([
+    API.donations.findByDonor(donorId),
+    API.appointments.findByDonor(donorId)
+  ]);
+  const donations = donRes.ok ? (Array.isArray(donRes.data)?donRes.data:donRes.data?.data||[]) : [];
+  const appts = apptRes.ok ? (Array.isArray(apptRes.data)?apptRes.data:apptRes.data?.data||[]) : [];
+  const completed = donations.filter(d => d.status==='completed');
+  const totalUnits = completed.reduce((s,d) => s+(d.units||d.unitsCollected||0), 0);
+  const nextAppt = appts.find(a => a.status==='booked'||a.status==='scheduled');
+
+  const set = (id, val) => { const el=document.getElementById(id); if(el) el.textContent=val; };
+  set('d-donations', donations.length);
+  set('d-units', totalUnits);
+  set('d-lives', Math.floor(totalUnits * 3));
+  set('d-next', nextAppt ? formatDate(nextAppt.date||nextAppt.scheduledDate) : 'None');
+}
+</script>
+</body>
+</html>

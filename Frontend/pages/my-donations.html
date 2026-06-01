@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Donations — LifePulse</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="app-layout">
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar" id="topbar"></header>
+    <main class="page-content">
+      <div class="page-header">
+        <div class="page-header-left"><h1>My Donation History</h1><p>Every unit you donate saves lives.</p></div>
+      </div>
+      <!-- Stats -->
+      <div class="stats-grid" style="margin-bottom:28px;">
+        <div class="stat-card"><div class="stat-icon red">💉</div><div class="stat-info"><div class="stat-value" id="my-don-count">—</div><div class="stat-label">Total Donations</div></div></div>
+        <div class="stat-card"><div class="stat-icon green">📦</div><div class="stat-info"><div class="stat-value" id="my-don-units">—</div><div class="stat-label">Units Donated</div></div></div>
+        <div class="stat-card"><div class="stat-icon blue">❤️</div><div class="stat-info"><div class="stat-value" id="my-lives">—</div><div class="stat-label">Lives Impacted</div></div></div>
+      </div>
+      <div class="card">
+        <div class="card-body" style="padding:0">
+          <div id="my-don-list"><div class="loading-overlay"><div class="loading-spinner"></div><p>Loading…</p></div></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<div id="toast-container"></div>
+<script src="../js/api.js"></script>
+<script src="../js/sidebar.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!requireAuth(['donor'])) return;
+  buildLayout({ activePage: 'my-donations.html', pageTitle: 'My Donations' });
+  const user = Auth.getUser();
+  if (!user?.donorId) { document.getElementById('my-don-list').innerHTML=`<div class="alert alert-warning" style="margin:20px;">Complete your donor profile first.</div>`; return; }
+  const res = await API.donations.findByDonor(user.donorId);
+  const el = document.getElementById('my-don-list');
+  if (!res.ok) { el.innerHTML = emptyState('❌','Failed to load',''); return; }
+  const items = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+  // Stats
+  const completed = items.filter(d => d.status === 'completed');
+  const totalUnits = completed.reduce((s,d) => s+(d.units||d.unitsCollected||0),0);
+  document.getElementById('my-don-count').textContent = items.length;
+  document.getElementById('my-don-units').textContent = totalUnits;
+  document.getElementById('my-lives').textContent = Math.floor(totalUnits * 3);
+  if (!items.length) { el.innerHTML = emptyState('💉','No donations yet','Your donation history will appear here.'); return; }
+  el.innerHTML = `<div class="table-container"><table>
+    <thead><tr><th>Date</th><th>Blood Group</th><th>Units</th><th>Hemoglobin</th><th>Status</th></tr></thead>
+    <tbody>${items.map(d => `<tr>
+      <td style="font-weight:600">${formatDate(d.date||d.donationDate||d.createdAt)}</td>
+      <td>${bloodBadge(d.bloodGroup)}</td>
+      <td><strong>${d.units||d.unitsCollected||'—'}</strong></td>
+      <td>${d.hemoglobin?d.hemoglobin+' g/dL':'—'}</td>
+      <td>${statusBadge(d.status)}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+});
+</script>
+</body>
+</html>
